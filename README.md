@@ -1,39 +1,54 @@
 # Gestão Simples
 
-Aplicação completa do Gestão Simples: front-end (login, agenda, clientes)
-e as API Routes financeiras descritas na **Documentação da API v1.0**
-(Drive/Notion do projeto) — cálculo de preço sugerido, registro de
-atendimentos (com split de comissão) e resumo de caixa. Construído em
-Next.js + Prisma, para rodar 100% grátis no Vercel usando o banco do
-Supabase já criado.
+MVP completo do Gestão Simples (Documento de Visão do Produto v2.0, Seção
+6): Agenda, Clientes, Serviços, Profissionais, Precificação e Caixa, com
+Dashboard mostrando faturamento do mês, comissões a repassar e
+atendimentos do dia. Construído em Next.js + Prisma, para rodar 100%
+grátis no Vercel usando o banco do Supabase já criado.
 
 ## Estrutura
 
 ```
 app/login/page.tsx                       → tela de login (e-mail/senha)
 app/dashboard/layout.tsx                 → navegação + proteção de sessão
-app/dashboard/page.tsx                   → home após login
+app/dashboard/page.tsx                   → indicadores (faturamento, comissões, atendimentos do dia)
 app/dashboard/agenda/page.tsx            → agenda do dia + criar agendamento
 app/dashboard/clientes/page.tsx          → lista + cadastro de clientes
+app/dashboard/servicos/page.tsx          → catálogo de serviços (duração, custo, preço)
+app/dashboard/profissionais/page.tsx     → equipe + percentual de comissão
+app/dashboard/precificacao/page.tsx      → configuração + calculadora de preço sugerido
+app/dashboard/caixa/page.tsx             → lançamento de atendimentos (agendados e avulsos)
 middleware.ts                            → redireciona para /login sem sessão
 lib/supabase/client.ts                   → cliente Supabase para o navegador
 lib/supabase/server.ts                   → cliente Supabase para Server Components
+lib/tenant.ts                            → descobre o tenant_id do usuário logado (necessário em todo insert)
 app/api/precificacao/calcular/route.ts   → POST cálculo de preço sugerido
-app/api/caixa/atendimentos/route.ts      → POST registro de atendimento
+app/api/caixa/atendimentos/route.ts      → POST registro de atendimento (split de comissão)
 app/api/caixa/resumo/route.ts            → GET resumo de caixa por período
+lib/caixa.ts                             → agregação do resumo de caixa (usada pela API Route e pelo Dashboard)
 lib/prisma.ts                            → conexão única com o banco (API Routes)
 lib/auth.ts                              → valida o login nas API Routes e descobre o tenant
 lib/precificacao.ts                      → fórmula de precificação
 prisma/schema.prisma                     → espelha as 8 tabelas já criadas no Supabase
 ```
 
-O login, a agenda e os clientes falam **direto com o Supabase** (via
+O login, a agenda, os clientes, os serviços, os profissionais e a
+configuração de precificação falam **direto com o Supabase** (via
 PostgREST, protegido por Row-Level Security) — não passam pelas API
-Routes. Só a parte financeira (precificação e caixa) passa pelas API
-Routes, porque envolve cálculo que não pode ficar exposto/alterável no
-navegador (decisão registrada na Documentação da API v1.0, Seção 6).
+Routes. Só a parte financeira sensível (cálculo de preço sugerido e
+fechamento de caixa com split de comissão) passa pelas API Routes, porque
+envolve cálculo que não pode ficar exposto/alterável no navegador
+(decisão registrada na Documentação da API v1.0, Seção 6).
 
-Importante: estas rotas usam a conexão direta ao banco (`DATABASE_URL`),
+Atenção — `tenant_id` em todo INSERT feito pelo navegador: a migration não
+define valor automático para `tenant_id` nas tabelas de negócio (a RLS só
+**exige**, via `with check`, que o valor gravado seja o do tenant atual —
+não o preenche sozinha). Por isso toda tela que cria um registro (Agenda,
+Clientes, Serviços, Profissionais, Precificação) busca o tenant_id com
+`lib/tenant.ts` antes de inserir. Ao criar uma nova tela com escrita direta
+no Supabase, sempre inclua esse passo.
+
+Importante: as API Routes usam a conexão direta ao banco (`DATABASE_URL`),
 que **não passa pela Row-Level Security**. Por isso todo filtro por
 `tenant_id` é feito manualmente no código — não remova esses filtros ao
 editar as rotas.
