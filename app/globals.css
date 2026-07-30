@@ -126,6 +126,48 @@ h3 {
   padding: 16px 12px 4px 12px;
 }
 
+.sidebar-collapsible {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5b6272;
+  padding: 16px 12px 4px 12px;
+  transition: color 0.15s ease;
+}
+
+.sidebar-section-toggle:hover {
+  color: var(--text-muted);
+}
+
+.sidebar-chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.sidebar-chevron-open {
+  transform: rotate(90deg);
+}
+
+.sidebar-collapsible-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 16px;
