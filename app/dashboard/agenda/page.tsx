@@ -60,9 +60,13 @@ export default function AgendaPage() {
 
   async function carregarListasBase() {
     const [{ data: c }, { data: p }, { data: s }] = await Promise.all([
-      supabase.from("clientes").select("id, nome").order("nome"),
+      supabase.from("clientes").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("profissionais").select("id, nome").eq("ativo", true).order("nome"),
-      supabase.from("servicos").select("id, nome, duracao_minutos").order("nome"),
+      supabase
+        .from("servicos")
+        .select("id, nome, duracao_minutos")
+        .eq("tipo", "servico")
+        .order("nome"),
     ]);
     setClientes((c as Cliente[]) ?? []);
     setProfissionais((p as Profissional[]) ?? []);
