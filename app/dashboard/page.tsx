@@ -154,6 +154,10 @@ export default async function DashboardHomePage() {
               <div className="tile-title">Fluxo de Caixa</div>
               <div className="tile-desc">Projeção de entradas e saídas</div>
             </Link>
+            <Link href="/dashboard/financeiro/contas-bancarias" className="tile">
+              <div className="tile-title">Contas Bancárias</div>
+              <div className="tile-desc">Cadastro e saldo das contas de banco</div>
+            </Link>
             <Link href="/dashboard/fornecedores" className="tile">
               <div className="tile-title">Fornecedores</div>
               <div className="tile-desc">Cadastro de fornecedores</div>

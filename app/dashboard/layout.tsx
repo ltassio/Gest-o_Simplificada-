@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPerfilForUserId } from "@/lib/auth";
 import { podeVerFinanceiro, podeGerenciarUsuarios } from "@/lib/permissoes";
 import LogoutButton from "./logout-button";
+import SidebarSection from "./sidebar-section";
 
 export default async function DashboardLayout({
   children,
@@ -60,27 +61,18 @@ export default async function DashboardLayout({
         </Link>
 
         {veFinanceiro && (
-          <>
-            <div className="sidebar-section-label">Financeiro</div>
-            <Link href="/dashboard/contas-a-pagar" className="sidebar-link">
-              Lançamento · Contas a Pagar
-            </Link>
-            <Link href="/dashboard/contas-a-receber" className="sidebar-link">
-              Lançamento · Contas a Receber
-            </Link>
-            <Link href="/dashboard/financeiro/fluxo-caixa" className="sidebar-link">
-              Fluxo de Caixa
-            </Link>
-            <Link href="/dashboard/fornecedores" className="sidebar-link">
-              Fornecedores
-            </Link>
-            <Link href="/dashboard/financeiro/formas-pagamento" className="sidebar-link">
-              Formas de Pagamento
-            </Link>
-            <Link href="/dashboard/financeiro/plano-contas" className="sidebar-link">
-              Plano de Contas
-            </Link>
-          </>
+          <SidebarSection
+            title="Financeiro"
+            links={[
+              { href: "/dashboard/contas-a-pagar", label: "Lançamento · Contas a Pagar" },
+              { href: "/dashboard/contas-a-receber", label: "Lançamento · Contas a Receber" },
+              { href: "/dashboard/financeiro/fluxo-caixa", label: "Fluxo de Caixa" },
+              { href: "/dashboard/financeiro/contas-bancarias", label: "Contas Bancárias" },
+              { href: "/dashboard/fornecedores", label: "Fornecedores" },
+              { href: "/dashboard/financeiro/formas-pagamento", label: "Formas de Pagamento" },
+              { href: "/dashboard/financeiro/plano-contas", label: "Plano de Contas" },
+            ]}
+          />
         )}
 
         {gereUsuarios && (
