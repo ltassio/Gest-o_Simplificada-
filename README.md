@@ -41,6 +41,8 @@ app/dashboard/usuarios/page.tsx          → lista a equipe + formulário de con
 app/dashboard/financeiro/fluxo-caixa/page.tsx      → página dedicada do fluxo de caixa (mesmo gráfico do Dashboard)
 app/dashboard/financeiro/formas-pagamento/page.tsx → cadastro de formas de pagamento
 app/dashboard/financeiro/plano-contas/page.tsx     → cadastro do plano de contas (categorias + linha da DRE)
+app/dashboard/financeiro/contas-bancarias/page.tsx → cadastro de contas bancárias e controle de saldo
+app/dashboard/sidebar-section.tsx        → seção comprimível da sidebar (usada pela aba "Financeiro")
 prisma/schema.prisma                     → espelha as tabelas já criadas no Supabase
 ```
 
@@ -157,6 +159,38 @@ valores padrão para um negócio de serviços (salão/estúdio) na migration
 Contas a Pagar e Contas a Receber já têm campos opcionais de categoria
 (Plano de Contas) e forma de pagamento — preenchê-los agora é o que vai
 alimentar a DRE com dados reais quando a Fase 3 chegar.
+
+### Contas Bancárias
+
+Adicionado em 30/07/2026, também a pedido do usuário: cadastro das contas
+de banco do estúdio (nome, banco, agência, número, tipo) com saldo
+inicial e saldo atual — para controlar quanto tem em cada conta,
+separado de Contas a Pagar/Receber (o que ainda vai sair/entrar) e do
+Caixa (caixa físico do dia a dia, Fase 2).
+
+Nesta primeira versão o saldo é atualizado **manualmente** pela própria
+tela (botão "Atualizar saldo" em cada linha) — pensado para bater com o
+extrato do banco sempre que o usuário quiser. Não há conciliação
+automática a partir dos lançamentos de Contas a Pagar/Receber ou do
+Caixa ainda; isso fica para uma fase futura, quando fizer sentido
+vincular cada lançamento a uma conta bancária específica (a tabela já
+foi desenhada pensando nisso, mas essa ligação não existe hoje).
+
+Migration `005_contas_bancarias.sql`, mesmo padrão de RLS por papel das
+demais tabelas do Financeiro (só `dono`/`financeiro` leem e escrevem).
+
+### Sidebar comprimível
+
+A partir de 30/07/2026 a seção "Financeiro" da barra lateral (muitos
+links: Contas a Pagar, Contas a Receber, Fluxo de Caixa, Contas
+Bancárias, Fornecedores, Formas de Pagamento, Plano de Contas) começa
+**fechada** por padrão e expande ao clicar no título — implementado em
+`app/dashboard/sidebar-section.tsx` (Client Component com estado local).
+Se a página atual já está dentro da seção (ex.: usuário deu refresh
+numa tela do Financeiro), a seção abre sozinha para não esconder onde a
+pessoa está. A seção "Administração" (Usuários) continua sempre visível
+normalmente, sem comprimir — só "Financeiro" tinha links demais para
+justificar isso.
 
 ## Passo a passo para colocar no ar
 
