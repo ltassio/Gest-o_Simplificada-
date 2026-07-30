@@ -87,7 +87,7 @@ export default function PrecificacaoPage() {
 
   async function carregarListas() {
     const [{ data: s }, { data: p }] = await Promise.all([
-      supabase.from("servicos").select("id, nome").order("nome"),
+      supabase.from("servicos").select("id, nome").eq("tipo", "servico").order("nome"),
       supabase.from("profissionais").select("id, nome").eq("ativo", true).order("nome"),
     ]);
     setServicos((s as Servico[]) ?? []);
