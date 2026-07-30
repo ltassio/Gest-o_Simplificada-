@@ -14,6 +14,28 @@ export class ApiAuthError extends Error {
 }
 
 /**
+ * Busca o tenant_id do usuário autenticado a partir da tabela `perfis`,
+ * usando Prisma (conexão direta ao banco, sem passar por RLS).
+ *
+ * Reaproveitada tanto pela validação de Bearer token das API Routes
+ * (getTenantFromRequest, abaixo) quanto por Server Components que já sabem
+ * o id do usuário via cookies de sessão — ex.: app/dashboard/page.tsx, que
+ * chama esta função diretamente para montar os indicadores do Dashboard
+ * sem precisar de um token Bearer nem de uma ida e volta HTTP.
+ */
+export async function getTenantIdForUserId(userId: string): Promise<string> {
+  const perfil = await prisma.perfil.findUnique({ where: { id: userId } });
+  if (!perfil) {
+    throw new ApiAuthError(
+      404,
+      "PERFIL_NAO_ENCONTRADO",
+      "Usuário autenticado não tem perfil vinculado a nenhum tenant."
+    );
+  }
+  return perfil.tenantId;
+}
+
+/**
  * Valida o token Bearer do Supabase Auth enviado pelo front-end e devolve
  * o tenant_id correspondente ao usuário logado.
  *
@@ -53,14 +75,7 @@ export async function getTenantFromRequest(
   }
 
   const userId = data.user.id;
+  const tenantId = await getTenantIdForUserId(userId);
 
-  // Esta consulta usa o Prisma direto no Postgres (via DATABASE_URL), que
-  // NÃO passa pela Row-Level Security. Por isso o tenant_id retornado aqui
-  // é a única fonte de verdade usada para filtrar tudo que a rota fizer.
-  const perfil = await prisma.perfil.findUnique({ where: { id: userId } });
-  if (!perfil) {
-    throw new ApiAuthError(404, "PERFIL_NAO_ENCONTRADO", "Usuário autenticado não tem perfil vinculado a nenhum tenant.");
-  }
-
-  return { userId, tenantId: perfil.tenantId };
+  return { userId, tenantId };
 }
