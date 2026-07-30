@@ -129,21 +129,18 @@ export default function AgendaPage() {
 
   return (
     <div>
-      <h1>Agenda</h1>
+      <h1 style={{ marginBottom: 6 }}>Agenda</h1>
 
-      <label>
-        Dia:{" "}
+      <label className="field" style={{ maxWidth: 200 }}>
+        Dia
         <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
       </label>
 
-      {erro && <p style={{ color: "#c0392b" }}>{erro}</p>}
+      {erro && <p className="alert-error">{erro}</p>}
 
-      <h2 style={{ marginTop: 24 }}>Novo agendamento</h2>
-      <form
-        onSubmit={handleCriar}
-        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+      <h2 className="section-title">Novo agendamento</h2>
+      <form onSubmit={handleCriar} className="form-row">
+        <label className="field">
           Cliente
           <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
             <option value="">Selecione</option>
@@ -154,7 +151,7 @@ export default function AgendaPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+        <label className="field">
           Profissional
           <select value={profissionalId} onChange={(e) => setProfissionalId(e.target.value)}>
             <option value="">Selecione</option>
@@ -165,7 +162,7 @@ export default function AgendaPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+        <label className="field">
           Serviço
           <select value={servicoId} onChange={(e) => setServicoId(e.target.value)}>
             <option value="">Selecione</option>
@@ -176,44 +173,46 @@ export default function AgendaPage() {
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+        <label className="field">
           Hora
           <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
         </label>
-        <button type="submit" disabled={salvando}>
+        <button type="submit" disabled={salvando} className="btn btn-primary">
           {salvando ? "Salvando..." : "Agendar"}
         </button>
       </form>
 
-      <h2 style={{ marginTop: 24 }}>Agendamentos do dia</h2>
+      <h2 className="section-title">Agendamentos do dia</h2>
       {carregando ? (
-        <p>Carregando...</p>
+        <p className="empty-state">Carregando...</p>
       ) : agendamentos.length === 0 ? (
-        <p>Nenhum agendamento para esse dia.</p>
+        <p className="empty-state">Nenhum agendamento para esse dia.</p>
       ) : (
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <table className="data-table">
           <thead>
             <tr>
-              <th style={th}>Horário</th>
-              <th style={th}>Cliente</th>
-              <th style={th}>Profissional</th>
-              <th style={th}>Serviço</th>
-              <th style={th}>Status</th>
+              <th>Horário</th>
+              <th>Cliente</th>
+              <th>Profissional</th>
+              <th>Serviço</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {agendamentos.map((a) => (
               <tr key={a.id}>
-                <td style={td}>
+                <td>
                   {new Date(a.data_hora_inicio).toLocaleTimeString("pt-BR", {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
                 </td>
-                <td style={td}>{a.clientes?.nome ?? "-"}</td>
-                <td style={td}>{a.profissionais?.nome ?? "-"}</td>
-                <td style={td}>{a.servicos?.nome ?? "-"}</td>
-                <td style={td}>{a.status}</td>
+                <td>{a.clientes?.nome ?? "-"}</td>
+                <td>{a.profissionais?.nome ?? "-"}</td>
+                <td>{a.servicos?.nome ?? "-"}</td>
+                <td>
+                  <span className="badge badge-accent">{a.status}</span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -222,6 +221,3 @@ export default function AgendaPage() {
     </div>
   );
 }
-
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "1px solid #ccc", padding: 8 };
-const td: React.CSSProperties = { borderBottom: "1px solid #eee", padding: 8 };
