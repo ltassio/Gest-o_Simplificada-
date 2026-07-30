@@ -33,6 +33,7 @@ model Tenant {
   contasReceber          ContaReceber[]
   formasPagamento        FormaPagamento[]
   planoContas            PlanoConta[]
+  contasBancarias        ContaBancaria[]
 
   @@map("tenants")
 }
@@ -271,4 +272,30 @@ model PlanoConta {
   contasReceber ContaReceber[]
 
   @@map("plano_contas")
+}
+
+// =============================================================================
+// Contas Bancárias — cadastro de contas de banco para controle de saldo,
+// adicionado em 30/07/2026 a pedido do usuário. Separado de Contas a Pagar/
+// Receber (que controlam o que ainda vai sair/entrar) e do Caixa (caixa
+// físico do dia a dia, Fase 2). Nesta primeira versão, saldo_atual é
+// atualizado manualmente pelo usuário (ex.: ao conferir o extrato) — não
+// há conciliação automática com lançamentos ainda.
+model ContaBancaria {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  nome          String
+  banco         String?
+  agencia       String?
+  numeroConta   String?  @map("numero_conta")
+  tipo          String   @default("corrente")
+  saldoInicial  Decimal  @default(0) @map("saldo_inicial") @db.Decimal(12, 2)
+  saldoAtual    Decimal  @default(0) @map("saldo_atual") @db.Decimal(12, 2)
+  ativa         Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("contas_bancarias")
 }
