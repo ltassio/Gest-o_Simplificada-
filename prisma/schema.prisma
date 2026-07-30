@@ -28,6 +28,9 @@ model Tenant {
   parametrosPrecificacao ParametroPrecificacao?
   agendamentos           Agendamento[]
   atendimentos           Atendimento[]
+  fornecedores           Fornecedor[]
+  contasPagar            ContaPagar[]
+  contasReceber          ContaReceber[]
 
   @@map("tenants")
 }
@@ -52,9 +55,10 @@ model Cliente {
   observacoes String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  agendamentos Agendamento[]
-  atendimentos Atendimento[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  agendamentos  Agendamento[]
+  atendimentos  Atendimento[]
+  contasReceber ContaReceber[]
 
   @@map("clientes")
 }
@@ -146,4 +150,63 @@ model Atendimento {
   servico      Servico      @relation(fields: [servicoId], references: [id])
 
   @@map("atendimentos")
+}
+
+// =============================================================================
+// Contas a Pagar / Contas a Receber — módulo financeiro adicionado em
+// 30/07/2026 (Documento de Modelagem de Banco de Dados v1.1).
+// Contas a Receber é separado do Caixa/Atendimentos: o Caixa assume
+// recebimento na hora; Contas a Receber é para dinheiro que ainda vai
+// entrar (fiado, parcelado, boleto). "Vencida" nunca é gravado como status —
+// é sempre derivado (status ainda aberto + data_vencimento no passado).
+// =============================================================================
+
+model Fornecedor {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  nome        String
+  telefone    String?
+  email       String?
+  cnpj        String?
+  observacoes String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  contasPagar ContaPagar[]
+
+  @@map("fornecedores")
+}
+
+model ContaPagar {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  fornecedorId   String    @map("fornecedor_id") @db.Uuid
+  descricao      String
+  valor          Decimal   @db.Decimal(10, 2)
+  dataVencimento DateTime  @map("data_vencimento") @db.Date
+  dataPagamento  DateTime? @map("data_pagamento") @db.Date
+  status         String    @default("a_pagar")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  fornecedor Fornecedor @relation(fields: [fornecedorId], references: [id])
+
+  @@map("contas_pagar")
+}
+
+model ContaReceber {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  clienteId        String    @map("cliente_id") @db.Uuid
+  descricao        String
+  valor            Decimal   @db.Decimal(10, 2)
+  dataVencimento   DateTime  @map("data_vencimento") @db.Date
+  dataRecebimento  DateTime? @map("data_recebimento") @db.Date
+  status           String    @default("a_receber")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@map("contas_receber")
 }
