@@ -322,6 +322,33 @@ h3 {
   border-color: rgba(124, 92, 255, 0.35);
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.stat-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
