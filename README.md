@@ -1,22 +1,37 @@
-# Gestão Simples — API Routes
+# Gestão Simples
 
-Backend das rotas financeiras descritas na **Documentação da API v1.0**
-(Drive/Notion do projeto): cálculo de preço sugerido, registro de
+Aplicação completa do Gestão Simples: front-end (login, agenda, clientes)
+e as API Routes financeiras descritas na **Documentação da API v1.0**
+(Drive/Notion do projeto) — cálculo de preço sugerido, registro de
 atendimentos (com split de comissão) e resumo de caixa. Construído em
-Next.js (API Routes) + Prisma, para rodar 100% grátis no Vercel usando o
-banco do Supabase já criado.
+Next.js + Prisma, para rodar 100% grátis no Vercel usando o banco do
+Supabase já criado.
 
 ## Estrutura
 
 ```
+app/login/page.tsx                       → tela de login (e-mail/senha)
+app/dashboard/layout.tsx                 → navegação + proteção de sessão
+app/dashboard/page.tsx                   → home após login
+app/dashboard/agenda/page.tsx            → agenda do dia + criar agendamento
+app/dashboard/clientes/page.tsx          → lista + cadastro de clientes
+middleware.ts                            → redireciona para /login sem sessão
+lib/supabase/client.ts                   → cliente Supabase para o navegador
+lib/supabase/server.ts                   → cliente Supabase para Server Components
 app/api/precificacao/calcular/route.ts   → POST cálculo de preço sugerido
 app/api/caixa/atendimentos/route.ts      → POST registro de atendimento
 app/api/caixa/resumo/route.ts            → GET resumo de caixa por período
-lib/prisma.ts                            → conexão única com o banco
-lib/auth.ts                              → valida o login do usuário e descobre o tenant
+lib/prisma.ts                            → conexão única com o banco (API Routes)
+lib/auth.ts                              → valida o login nas API Routes e descobre o tenant
 lib/precificacao.ts                      → fórmula de precificação
 prisma/schema.prisma                     → espelha as 8 tabelas já criadas no Supabase
 ```
+
+O login, a agenda e os clientes falam **direto com o Supabase** (via
+PostgREST, protegido por Row-Level Security) — não passam pelas API
+Routes. Só a parte financeira (precificação e caixa) passa pelas API
+Routes, porque envolve cálculo que não pode ficar exposto/alterável no
+navegador (decisão registrada na Documentação da API v1.0, Seção 6).
 
 Importante: estas rotas usam a conexão direta ao banco (`DATABASE_URL`),
 que **não passa pela Row-Level Security**. Por isso todo filtro por
@@ -41,13 +56,16 @@ No painel do seu projeto Supabase ("Gestão Simples"):
 - **Project Settings → API Keys**
   - Copie o **Project URL** → isso é o `SUPABASE_URL`.
   - Copie a **secret key** (começa com `sb_secret_...`) → isso é o `SUPABASE_SECRET_KEY`.
+  - Copie também a **publishable key** (começa com `sb_publishable_...`) → isso é o `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Essa é segura para expor no navegador, diferente da secret key.
+  - O mesmo Project URL do passo acima serve também para `NEXT_PUBLIC_SUPABASE_URL`.
   - Não use o "Legacy JWT Secret" — esse projeto já usa as JWT Signing Keys novas, e a validação é feita chamando o próprio Supabase, não com um segredo fixo.
 
 ### 3. Criar o projeto na Vercel
 1. Entre em vercel.com com sua conta (pode logar com GitHub).
 2. "Add New" → "Project" → selecione o repositório que você acabou de subir.
-3. Em "Environment Variables", adicione as quatro variáveis do passo 2:
-   `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`.
+3. Em "Environment Variables", adicione as seis variáveis do passo 2:
+   `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`,
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 4. Clique em "Deploy".
 
 Pronto: a Vercel vai instalar as dependências, gerar o Prisma Client e
