@@ -117,6 +117,15 @@ h3 {
   color: var(--text);
 }
 
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5b6272;
+  padding: 16px 12px 4px 12px;
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: 16px;
