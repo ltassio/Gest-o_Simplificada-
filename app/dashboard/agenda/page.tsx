@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getTenantId } from "@/lib/tenant";
 
 interface Cliente {
   id: string;
@@ -106,25 +107,32 @@ export default function AgendaPage() {
     const fimDate = new Date(inicio.getTime() + duracao * 60000);
 
     setSalvando(true);
-    const { error } = await supabase.from("agendamentos").insert({
-      cliente_id: clienteId,
-      profissional_id: profissionalId,
-      servico_id: servicoId,
-      data_hora_inicio: inicio.toISOString(),
-      data_hora_fim: fimDate.toISOString(),
-    });
-    setSalvando(false);
+    try {
+      const tenantId = await getTenantId(supabase);
+      const { error } = await supabase.from("agendamentos").insert({
+        tenant_id: tenantId,
+        cliente_id: clienteId,
+        profissional_id: profissionalId,
+        servico_id: servicoId,
+        data_hora_inicio: inicio.toISOString(),
+        data_hora_fim: fimDate.toISOString(),
+      });
 
-    if (error) {
-      setErro("Não foi possível criar o agendamento: " + error.message);
-      return;
+      if (error) {
+        setErro("Não foi possível criar o agendamento: " + error.message);
+        return;
+      }
+
+      setErro(null);
+      setClienteId("");
+      setProfissionalId("");
+      setServicoId("");
+      carregarAgendamentosDoDia();
+    } catch (e: any) {
+      setErro(e.message ?? "Erro inesperado.");
+    } finally {
+      setSalvando(false);
     }
-
-    setErro(null);
-    setClienteId("");
-    setProfissionalId("");
-    setServicoId("");
-    carregarAgendamentosDoDia();
   }
 
   return (
