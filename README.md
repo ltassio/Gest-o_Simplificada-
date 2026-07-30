@@ -13,8 +13,8 @@ app/login/page.tsx                       → tela de login (e-mail/senha)
 app/dashboard/layout.tsx                 → navegação + proteção de sessão
 app/dashboard/page.tsx                   → indicadores (faturamento, comissões, atendimentos do dia)
 app/dashboard/agenda/page.tsx            → agenda do dia + criar agendamento
-app/dashboard/clientes/page.tsx          → lista + cadastro de clientes
-app/dashboard/servicos/page.tsx          → catálogo de serviços (duração, custo, preço)
+app/dashboard/clientes/page.tsx          → lista + cadastro de clientes, status Ativo/Inativo, histórico de atendimentos
+app/dashboard/servicos/page.tsx          → catálogo de produtos e serviços (tipo, duração, custo, preço)
 app/dashboard/profissionais/page.tsx     → equipe + percentual de comissão
 app/dashboard/precificacao/page.tsx      → configuração + calculadora de preço sugerido
 app/dashboard/caixa/page.tsx             → lançamento de atendimentos (agendados e avulsos)
@@ -42,7 +42,7 @@ app/dashboard/financeiro/fluxo-caixa/page.tsx      → página dedicada do fluxo
 app/dashboard/financeiro/formas-pagamento/page.tsx → cadastro de formas de pagamento
 app/dashboard/financeiro/plano-contas/page.tsx     → cadastro do plano de contas (categorias + linha da DRE)
 app/dashboard/financeiro/contas-bancarias/page.tsx → cadastro de contas bancárias e controle de saldo
-app/dashboard/sidebar-section.tsx        → seção comprimível da sidebar (usada pela aba "Financeiro")
+app/dashboard/sidebar-section.tsx        → seção comprimível da sidebar (usada por "Cadastro de Parceiro" e "Financeiro")
 prisma/schema.prisma                     → espelha as tabelas já criadas no Supabase
 ```
 
@@ -181,16 +181,50 @@ demais tabelas do Financeiro (só `dono`/`financeiro` leem e escrevem).
 
 ### Sidebar comprimível
 
-A partir de 30/07/2026 a seção "Financeiro" da barra lateral (muitos
-links: Contas a Pagar, Contas a Receber, Fluxo de Caixa, Contas
-Bancárias, Fornecedores, Formas de Pagamento, Plano de Contas) começa
-**fechada** por padrão e expande ao clicar no título — implementado em
-`app/dashboard/sidebar-section.tsx` (Client Component com estado local).
-Se a página atual já está dentro da seção (ex.: usuário deu refresh
-numa tela do Financeiro), a seção abre sozinha para não esconder onde a
-pessoa está. A seção "Administração" (Usuários) continua sempre visível
-normalmente, sem comprimir — só "Financeiro" tinha links demais para
-justificar isso.
+A partir de 30/07/2026 as seções "Cadastro de Parceiro" e "Financeiro" da
+barra lateral começam **fechadas** por padrão e expandem ao clicar no
+título — implementado em `app/dashboard/sidebar-section.tsx` (Client
+Component com estado local). Se a página atual já está dentro da seção
+(ex.: usuário deu refresh numa tela do Financeiro), a seção abre sozinha
+para não esconder onde a pessoa está. A seção "Administração" (Usuários)
+continua sempre visível normalmente, sem comprimir.
+
+### Cadastro de Parceiro
+
+Adicionado em 30/07/2026 a pedido do usuário: agrupa Fornecedor,
+Profissional e Cliente na mesma seção da sidebar, já que os três são
+"parceiros" do negócio (quem fornece, quem atende, quem é atendido).
+Fornecedor só aparece no menu para `dono`/`financeiro` (mesma regra de
+sempre, reforçada por RLS); Profissional e Cliente continuam visíveis
+para qualquer papel.
+
+### Produto e Serviço
+
+Também 30/07/2026: a antiga tela "Serviços" virou "Produtos e Serviços".
+Em vez de criar uma tabela nova, a tabela `servicos` ganhou a coluna
+`tipo` (`'servico'` ou `'produto'`, migration `006`) — as duas coisas
+compartilham cadastro (nome, preço, categoria) e Serviço já é referenciado
+por Agendamento/Atendimento, então separar em tabelas duplicaria essas
+relações sem ganho real agora. Duração e custo de material só aparecem no
+formulário quando o tipo é "Serviço". Agenda, Caixa e Precificação
+filtram por `tipo = 'servico'` ao listar opções, então produtos não
+aparecem como algo agendável/atendível — o cadastro de produto serve por
+enquanto só para catálogo e preço.
+
+### Clientes: status e histórico de atendimentos
+
+Cliente ganhou o campo `ativo` (migration `006`, mesmo padrão de
+`profissionais.ativo`), com botão Ativar/Desativar na lista — cliente
+inativo continua aparecendo no histórico, só some das listas de "cliente
+ativo" usadas em Agenda, Caixa e Contas a Receber ao criar um novo
+lançamento.
+
+A tela de Clientes também ganhou um botão "Ver histórico" por linha, que
+expande a lista de atendimentos daquele cliente (data, profissional que
+atendeu, serviço e valor cobrado) — consulta direta em `atendimentos`
+com join em `profissionais`/`servicos`, sem precisar de API Route
+própria porque essas tabelas já são abertas por RLS a qualquer papel do
+tenant.
 
 ## Passo a passo para colocar no ar
 
