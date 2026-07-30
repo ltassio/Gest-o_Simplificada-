@@ -36,6 +36,27 @@ export async function getTenantIdForUserId(userId: string): Promise<string> {
 }
 
 /**
+ * Igual a getTenantIdForUserId, mas também devolve o papel do usuário
+ * (Fase 1 do módulo Financeiro — controle de acesso). Usada por Server
+ * Components (ex.: app/dashboard/layout.tsx, app/dashboard/usuarios) e
+ * por API Routes que precisam checar se o chamador é "dono" antes de
+ * permitir a ação (ex.: /api/usuarios/convidar).
+ */
+export async function getPerfilForUserId(
+  userId: string
+): Promise<{ tenantId: string; papel: string }> {
+  const perfil = await prisma.perfil.findUnique({ where: { id: userId } });
+  if (!perfil) {
+    throw new ApiAuthError(
+      404,
+      "PERFIL_NAO_ENCONTRADO",
+      "Usuário autenticado não tem perfil vinculado a nenhum tenant."
+    );
+  }
+  return { tenantId: perfil.tenantId, papel: perfil.papel };
+}
+
+/**
  * Valida o token Bearer do Supabase Auth enviado pelo front-end e devolve
  * o tenant_id correspondente ao usuário logado.
  *

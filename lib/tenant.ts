@@ -35,3 +35,31 @@ export async function getTenantId(supabase: SupabaseClient): Promise<string> {
 
   return data.tenant_id as string;
 }
+
+// Igual a getTenantId, mas também devolve o papel do usuário (Fase 1 do
+// módulo Financeiro — controle de acesso). Usada pelas páginas que
+// precisam decidir o que mostrar/permitir com base no papel (ex.: só
+// dono/financeiro veem o módulo Financeiro).
+export async function getMeuPerfil(
+  supabase: SupabaseClient
+): Promise<{ tenantId: string; papel: string; nome: string | null }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Usuário não autenticado.");
+  }
+
+  const { data, error } = await supabase
+    .from("perfis")
+    .select("tenant_id, papel, nome")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !data) {
+    throw new Error("Não foi possível identificar o perfil do usuário.");
+  }
+
+  return { tenantId: data.tenant_id as string, papel: data.papel as string, nome: data.nome as string | null };
+}
