@@ -18,6 +18,10 @@ app/dashboard/servicos/page.tsx          → catálogo de serviços (duração, 
 app/dashboard/profissionais/page.tsx     → equipe + percentual de comissão
 app/dashboard/precificacao/page.tsx      → configuração + calculadora de preço sugerido
 app/dashboard/caixa/page.tsx             → lançamento de atendimentos (agendados e avulsos)
+app/dashboard/fornecedores/page.tsx      → cadastro de fornecedores (nome, telefone, e-mail, CNPJ)
+app/dashboard/contas-a-pagar/page.tsx    → lançamento, status (A Pagar/Paga/Vencida) e visão de atraso por fornecedor
+app/dashboard/contas-a-receber/page.tsx  → lançamento, status (A Receber/Recebida/Vencida) e visão de atraso por cliente
+app/dashboard/fluxo-caixa-chart.tsx      → gráfico (recharts) do fluxo de caixa projetado, usado no Dashboard
 middleware.ts                            → redireciona para /login sem sessão
 lib/supabase/client.ts                   → cliente Supabase para o navegador
 lib/supabase/server.ts                   → cliente Supabase para Server Components
@@ -26,11 +30,30 @@ app/api/precificacao/calcular/route.ts   → POST cálculo de preço sugerido
 app/api/caixa/atendimentos/route.ts      → POST registro de atendimento (split de comissão)
 app/api/caixa/resumo/route.ts            → GET resumo de caixa por período
 lib/caixa.ts                             → agregação do resumo de caixa (usada pela API Route e pelo Dashboard)
+lib/fluxoCaixa.ts                        → agregação de Contas a Pagar/Receber em aberto por faixa de vencimento (usada pelo Dashboard)
 lib/prisma.ts                            → conexão única com o banco (API Routes)
 lib/auth.ts                              → valida o login nas API Routes e descobre o tenant
 lib/precificacao.ts                      → fórmula de precificação
-prisma/schema.prisma                     → espelha as 8 tabelas já criadas no Supabase
+prisma/schema.prisma                     → espelha as 11 tabelas já criadas no Supabase
 ```
+
+## Contas a Pagar / Contas a Receber
+
+Módulo adicionado em 30/07/2026, separado do Caixa: o Caixa assume que o
+atendimento foi pago na hora (dinheiro/pix/cartão à vista); Contas a Pagar
+e Contas a Receber existem para dinheiro que ainda vai sair/entrar (fiado,
+parcelado, boleto a vencer) — não há geração automática de conta a receber
+a partir de um atendimento do Caixa.
+
+"Vencida" nunca é um status gravado no banco: é sempre calculado comparando
+`data_vencimento` com a data de hoje (ver `diasDeAtraso` nas duas telas e a
+constraint check no lugar da migration). Isso evita depender de um job
+diário para manter o status atualizado.
+
+A migration `003_contas_pagar_receber.sql` cria as tabelas `fornecedores`,
+`contas_pagar` e `contas_receber`, seguindo o mesmo padrão de RLS por
+`tenant_id` das tabelas anteriores — aplique-a no SQL Editor do Supabase
+como as demais.
 
 O login, a agenda, os clientes, os serviços, os profissionais e a
 configuração de precificação falam **direto com o Supabase** (via
