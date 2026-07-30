@@ -14,17 +14,7 @@ export default function LogoutButton() {
   }
 
   return (
-    <button
-      onClick={handleLogout}
-      style={{
-        background: "none",
-        border: "1px solid #ccc",
-        borderRadius: 4,
-        padding: "6px 10px",
-        cursor: "pointer",
-        fontSize: 13,
-      }}
-    >
+    <button onClick={handleLogout} className="btn btn-ghost btn-block">
       Sair
     </button>
   );

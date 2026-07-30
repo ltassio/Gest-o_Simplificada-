@@ -20,26 +20,29 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "sans-serif" }}>
-      <nav
-        style={{
-          width: 200,
-          borderRight: "1px solid #eee",
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
-      >
-        <strong style={{ marginBottom: 16 }}>Gestão Simples</strong>
-        <Link href="/dashboard">Início</Link>
-        <Link href="/dashboard/agenda">Agenda</Link>
-        <Link href="/dashboard/clientes">Clientes</Link>
-        <div style={{ marginTop: "auto" }}>
+    <div className="dashboard-shell">
+      <nav className="sidebar">
+        <div className="sidebar-brand">
+          <span className="dot" />
+          <span>Gestão Simples</span>
+        </div>
+
+        <Link href="/dashboard" className="sidebar-link">
+          Início
+        </Link>
+        <Link href="/dashboard/agenda" className="sidebar-link">
+          Agenda
+        </Link>
+        <Link href="/dashboard/clientes" className="sidebar-link">
+          Clientes
+        </Link>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">{user.email}</div>
           <LogoutButton />
         </div>
       </nav>
-      <main style={{ flex: 1, padding: 32 }}>{children}</main>
+      <main className="main-content">{children}</main>
     </div>
   );
 }
