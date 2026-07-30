@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getTenantId } from "@/lib/tenant";
 
 interface Cliente {
   id: string;
@@ -52,23 +53,30 @@ export default function ClientesPage() {
     }
 
     setSalvando(true);
-    const { error } = await supabase.from("clientes").insert({
-      nome: nome.trim(),
-      telefone: telefone.trim() || null,
-      email: email.trim() || null,
-    });
-    setSalvando(false);
+    try {
+      const tenantId = await getTenantId(supabase);
+      const { error } = await supabase.from("clientes").insert({
+        tenant_id: tenantId,
+        nome: nome.trim(),
+        telefone: telefone.trim() || null,
+        email: email.trim() || null,
+      });
 
-    if (error) {
-      setErro("Não foi possível salvar o cliente: " + error.message);
-      return;
+      if (error) {
+        setErro("Não foi possível salvar o cliente: " + error.message);
+        return;
+      }
+
+      setErro(null);
+      setNome("");
+      setTelefone("");
+      setEmail("");
+      carregarClientes();
+    } catch (e: any) {
+      setErro(e.message ?? "Erro inesperado.");
+    } finally {
+      setSalvando(false);
     }
-
-    setErro(null);
-    setNome("");
-    setTelefone("");
-    setEmail("");
-    carregarClientes();
   }
 
   return (
