@@ -73,52 +73,49 @@ export default function ClientesPage() {
 
   return (
     <div>
-      <h1>Clientes</h1>
+      <h1 style={{ marginBottom: 6 }}>Clientes</h1>
 
-      {erro && <p style={{ color: "#c0392b" }}>{erro}</p>}
+      {erro && <p className="alert-error">{erro}</p>}
 
-      <h2 style={{ marginTop: 24 }}>Novo cliente</h2>
-      <form
-        onSubmit={handleCriar}
-        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+      <h2 className="section-title">Novo cliente</h2>
+      <form onSubmit={handleCriar} className="form-row">
+        <label className="field">
           Nome
           <input value={nome} onChange={(e) => setNome(e.target.value)} required />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+        <label className="field">
           Telefone
           <input value={telefone} onChange={(e) => setTelefone(e.target.value)} />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13 }}>
+        <label className="field">
           E-mail
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
-        <button type="submit" disabled={salvando}>
+        <button type="submit" disabled={salvando} className="btn btn-primary">
           {salvando ? "Salvando..." : "Cadastrar"}
         </button>
       </form>
 
-      <h2 style={{ marginTop: 24 }}>Todos os clientes</h2>
+      <h2 className="section-title">Todos os clientes</h2>
       {carregando ? (
-        <p>Carregando...</p>
+        <p className="empty-state">Carregando...</p>
       ) : clientes.length === 0 ? (
-        <p>Nenhum cliente cadastrado ainda.</p>
+        <p className="empty-state">Nenhum cliente cadastrado ainda.</p>
       ) : (
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <table className="data-table">
           <thead>
             <tr>
-              <th style={th}>Nome</th>
-              <th style={th}>Telefone</th>
-              <th style={th}>E-mail</th>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>E-mail</th>
             </tr>
           </thead>
           <tbody>
             {clientes.map((c) => (
               <tr key={c.id}>
-                <td style={td}>{c.nome}</td>
-                <td style={td}>{c.telefone ?? "-"}</td>
-                <td style={td}>{c.email ?? "-"}</td>
+                <td>{c.nome}</td>
+                <td>{c.telefone ?? "-"}</td>
+                <td>{c.email ?? "-"}</td>
               </tr>
             ))}
           </tbody>
@@ -127,6 +124,3 @@ export default function ClientesPage() {
     </div>
   );
 }
-
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "1px solid #ccc", padding: 8 };
-const td: React.CSSProperties = { borderBottom: "1px solid #eee", padding: 8 };
