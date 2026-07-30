@@ -9,6 +9,11 @@ interface ClienteOpcao {
   nome: string;
 }
 
+interface OpcaoNome {
+  id: string;
+  nome: string;
+}
+
 interface ContaReceber {
   id: string;
   cliente_id: string;
@@ -18,6 +23,8 @@ interface ContaReceber {
   data_recebimento: string | null;
   status: "a_receber" | "recebida";
   clientes: { nome: string } | null;
+  plano_contas: { nome: string } | null;
+  formas_pagamento: { nome: string } | null;
 }
 
 function formatarMoeda(valor: number) {
@@ -50,6 +57,8 @@ export default function ContasAReceberPage() {
 
   const [contas, setContas] = useState<ContaReceber[]>([]);
   const [clientes, setClientes] = useState<ClienteOpcao[]>([]);
+  const [planoContas, setPlanoContas] = useState<OpcaoNome[]>([]);
+  const [formasPagamento, setFormasPagamento] = useState<OpcaoNome[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -57,6 +66,8 @@ export default function ContasAReceberPage() {
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [dataVencimento, setDataVencimento] = useState("");
+  const [planoContaId, setPlanoContaId] = useState("");
+  const [formaPagamentoId, setFormaPagamentoId] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -66,14 +77,16 @@ export default function ContasAReceberPage() {
 
   async function carregarTudo() {
     setCarregando(true);
-    const [contasRes, clientesRes] = await Promise.all([
+    const [contasRes, clientesRes, planoContasRes, formasPagamentoRes] = await Promise.all([
       supabase
         .from("contas_receber")
         .select(
-          "id, cliente_id, descricao, valor, data_vencimento, data_recebimento, status, clientes ( nome )"
+          "id, cliente_id, descricao, valor, data_vencimento, data_recebimento, status, clientes ( nome ), plano_contas ( nome ), formas_pagamento ( nome )"
         )
         .order("data_vencimento"),
       supabase.from("clientes").select("id, nome").order("nome"),
+      supabase.from("plano_contas").select("id, nome").eq("tipo", "receita").eq("ativo", true).order("nome"),
+      supabase.from("formas_pagamento").select("id, nome").eq("ativa", true).order("nome"),
     ]);
 
     if (contasRes.error || clientesRes.error) {
@@ -81,6 +94,8 @@ export default function ContasAReceberPage() {
     } else {
       setContas((contasRes.data as any) ?? []);
       setClientes((clientesRes.data as ClienteOpcao[]) ?? []);
+      setPlanoContas((planoContasRes.data as OpcaoNome[]) ?? []);
+      setFormasPagamento((formasPagamentoRes.data as OpcaoNome[]) ?? []);
       setErro(null);
     }
     setCarregando(false);
@@ -103,6 +118,8 @@ export default function ContasAReceberPage() {
         descricao: descricao.trim(),
         valor: parseFloat(valor.replace(",", ".")),
         data_vencimento: dataVencimento,
+        plano_conta_id: planoContaId || null,
+        forma_pagamento_id: formaPagamentoId || null,
       });
 
       if (error) {
@@ -115,6 +132,8 @@ export default function ContasAReceberPage() {
       setDescricao("");
       setValor("");
       setDataVencimento("");
+      setPlanoContaId("");
+      setFormaPagamentoId("");
       carregarTudo();
     } catch (e: any) {
       setErro(e.message ?? "Erro inesperado.");
@@ -181,6 +200,28 @@ export default function ContasAReceberPage() {
             required
           />
         </label>
+        <label className="field">
+          Categoria (opcional)
+          <select value={planoContaId} onChange={(e) => setPlanoContaId(e.target.value)}>
+            <option value="">Sem categoria</option>
+            {planoContas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          Forma de pagamento (opcional)
+          <select value={formaPagamentoId} onChange={(e) => setFormaPagamentoId(e.target.value)}>
+            <option value="">Não informada</option>
+            {formasPagamento.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nome}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" disabled={salvando} className="btn btn-primary">
           {salvando ? "Salvando..." : "Lançar"}
         </button>
@@ -235,6 +276,7 @@ export default function ContasAReceberPage() {
             <tr>
               <th>Cliente</th>
               <th>Descrição</th>
+              <th>Categoria</th>
               <th>Valor</th>
               <th>Vencimento</th>
               <th>Status</th>
@@ -248,6 +290,7 @@ export default function ContasAReceberPage() {
                 <tr key={c.id}>
                   <td>{c.clientes?.nome ?? "-"}</td>
                   <td>{c.descricao}</td>
+                  <td>{c.plano_contas?.nome ?? "-"}</td>
                   <td>{formatarMoeda(Number(c.valor))}</td>
                   <td>{formatarData(c.data_vencimento)}</td>
                   <td>
