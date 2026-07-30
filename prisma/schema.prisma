@@ -1,0 +1,149 @@
+// =============================================================================
+// Gestão Simples — Prisma Schema
+// Espelha exatamente as tabelas criadas pela migration 001_schema_inicial.sql
+// no Supabase. Não roda "prisma migrate" aqui: as tabelas já existem, este
+// schema serve para o Prisma Client conseguir ler/escrever nelas com
+// segurança de tipos.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  nome      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  perfis                 Perfil[]
+  clientes               Cliente[]
+  profissionais          Profissional[]
+  servicos               Servico[]
+  parametrosPrecificacao ParametroPrecificacao?
+  agendamentos           Agendamento[]
+  atendimentos           Atendimento[]
+
+  @@map("tenants")
+}
+
+model Perfil {
+  id        String   @id @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  nome      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("perfis")
+}
+
+model Cliente {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  nome        String
+  telefone    String?
+  email       String?
+  observacoes String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  agendamentos Agendamento[]
+  atendimentos Atendimento[]
+
+  @@map("clientes")
+}
+
+model Profissional {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  nome               String
+  percentualComissao Decimal  @default(0) @map("percentual_comissao") @db.Decimal(5, 2)
+  ativo              Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  agendamentos Agendamento[]
+  atendimentos Atendimento[]
+
+  @@map("profissionais")
+}
+
+model Servico {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  nome           String
+  duracaoMinutos Int      @map("duracao_minutos")
+  custoMaterial  Decimal  @default(0) @map("custo_material") @db.Decimal(10, 2)
+  preco          Decimal  @default(0) @db.Decimal(10, 2)
+  categoria      String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  agendamentos Agendamento[]
+  atendimentos Atendimento[]
+
+  @@map("servicos")
+}
+
+model ParametroPrecificacao {
+  id                       String   @id @default(uuid()) @db.Uuid
+  tenantId                 String   @unique @map("tenant_id") @db.Uuid
+  custoFixoMensal          Decimal  @default(0) @map("custo_fixo_mensal") @db.Decimal(10, 2)
+  horasProdutivasMes       Decimal  @default(0) @map("horas_produtivas_mes") @db.Decimal(6, 2)
+  percentualImposto        Decimal  @default(0) @map("percentual_imposto") @db.Decimal(5, 2)
+  percentualMargemDesejada Decimal  @default(0) @map("percentual_margem_desejada") @db.Decimal(5, 2)
+  updatedAt                DateTime @default(now()) @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("parametros_precificacao")
+}
+
+model Agendamento {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  clienteId        String   @map("cliente_id") @db.Uuid
+  profissionalId   String   @map("profissional_id") @db.Uuid
+  servicoId        String   @map("servico_id") @db.Uuid
+  dataHoraInicio   DateTime @map("data_hora_inicio")
+  dataHoraFim      DateTime @map("data_hora_fim")
+  status           String   @default("agendado")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  profissional Profissional @relation(fields: [profissionalId], references: [id])
+  servico      Servico      @relation(fields: [servicoId], references: [id])
+  atendimento  Atendimento?
+
+  @@map("agendamentos")
+}
+
+model Atendimento {
+  id                          String   @id @default(uuid()) @db.Uuid
+  tenantId                    String   @map("tenant_id") @db.Uuid
+  agendamentoId               String?  @unique @map("agendamento_id") @db.Uuid
+  clienteId                   String   @map("cliente_id") @db.Uuid
+  profissionalId              String   @map("profissional_id") @db.Uuid
+  servicoId                   String   @map("servico_id") @db.Uuid
+  valorCobrado                Decimal  @map("valor_cobrado") @db.Decimal(10, 2)
+  percentualComissaoAplicado  Decimal  @map("percentual_comissao_aplicado") @db.Decimal(5, 2)
+  valorComissao               Decimal  @map("valor_comissao") @db.Decimal(10, 2)
+  valorEstudio                Decimal  @map("valor_estudio") @db.Decimal(10, 2)
+  dataAtendimento              DateTime @default(now()) @map("data_atendimento")
+  createdAt                   DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  agendamento  Agendamento? @relation(fields: [agendamentoId], references: [id])
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  profissional Profissional @relation(fields: [profissionalId], references: [id])
+  servico      Servico      @relation(fields: [servicoId], references: [id])
+
+  @@map("atendimentos")
+}
