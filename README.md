@@ -34,7 +34,14 @@ lib/fluxoCaixa.ts                        → agregação de Contas a Pagar/Receb
 lib/prisma.ts                            → conexão única com o banco (API Routes)
 lib/auth.ts                              → valida o login nas API Routes e descobre o tenant
 lib/precificacao.ts                      → fórmula de precificação
-prisma/schema.prisma                     → espelha as 11 tabelas já criadas no Supabase
+lib/permissoes.ts                        → regras de acesso por papel (dono/financeiro/operador)
+lib/dre.ts                               → estrutura/labels da DRE (natureza_dre), usada no Plano de Contas e na Fase 3
+app/api/usuarios/convidar/route.ts       → POST cria um novo usuário do tenant (só "dono" pode chamar)
+app/dashboard/usuarios/page.tsx          → lista a equipe + formulário de convite (só "dono")
+app/dashboard/financeiro/fluxo-caixa/page.tsx      → página dedicada do fluxo de caixa (mesmo gráfico do Dashboard)
+app/dashboard/financeiro/formas-pagamento/page.tsx → cadastro de formas de pagamento
+app/dashboard/financeiro/plano-contas/page.tsx     → cadastro do plano de contas (categorias + linha da DRE)
+prisma/schema.prisma                     → espelha as tabelas já criadas no Supabase
 ```
 
 ## Contas a Pagar / Contas a Receber
@@ -75,6 +82,81 @@ Importante: as API Routes usam a conexão direta ao banco (`DATABASE_URL`),
 que **não passa pela Row-Level Security**. Por isso todo filtro por
 `tenant_id` é feito manualmente no código — não remova esses filtros ao
 editar as rotas.
+
+## Módulo Financeiro (aba "Financeiro")
+
+Adicionado em 30/07/2026 (Documento de Modelagem de Banco de Dados v1.2),
+por pedido do usuário: uma aba "Financeiro" reunindo Lançamento (Contas a
+Pagar/Receber), Fluxo de Caixa, Formas de Pagamento, Plano de Contas, DRE,
+Caixa aberto/fechado e Orçamento — junto com controle de acesso por papel.
+Combinado com o usuário implementar por fases:
+
+- **Fase 1 (entregue nesta versão):** controle de acesso (usuários com
+  papel), Formas de Pagamento, Plano de Contas, reorganização do menu.
+- **Fase 2 (próxima):** Caixa com abertura/fechamento (caixa único por
+  dia) e Visão de Caixa Mensal/Anual.
+- **Fase 3 (depois):** DRE completa (padrão contábil) e Orçamento,
+  usando o Plano de Contas já cadastrado nesta fase.
+
+### Controle de acesso (papéis)
+
+Cada usuário (`perfis`) agora tem um `papel`: **dono**, **financeiro** ou
+**operador**.
+
+- **Dono** — acesso total, único papel que gerencia usuários (tela
+  `/dashboard/usuarios`).
+- **Financeiro** — acesso total ao módulo Financeiro (lançar, ver Fluxo
+  de Caixa, Plano de Contas, Formas de Pagamento, e nas próximas fases
+  DRE/Orçamento), mas não gerencia usuários.
+- **Operador** — **não enxerga o módulo Financeiro** (Contas a Pagar/
+  Receber, Fornecedores, Plano de Contas, Formas de Pagamento). Continua
+  vendo Agenda, Clientes, Serviços e Caixa (atendimentos do dia).
+
+A restrição é aplicada em duas camadas, e a do banco é a que vale de
+verdade:
+
+1. **RLS no Supabase** (função `papel_atual()`, migration
+   `004_financeiro_fase1.sql`): as políticas de `fornecedores`,
+   `contas_pagar`, `contas_receber`, `formas_pagamento` e `plano_contas`
+   só permitem leitura/escrita para `papel_atual() in ('dono',
+   'financeiro')`. Isso vale mesmo que alguém chame a API do Supabase
+   diretamente, sem passar pela interface.
+2. **Ocultação de menu/seções na UI** (`lib/permissoes.ts`): usabilidade,
+   não segurança — some com os links e cards que o papel não deveria ver.
+
+Atenção para código novo que usa **Prisma** (API Routes e Server
+Components, ex.: `app/dashboard/page.tsx`): a conexão via `DATABASE_URL`
+**não passa pela RLS**, então o filtro por papel precisa ser feito
+manualmente no código (ver `podeVerFinanceiro()` sendo checado antes de
+chamar `getFluxoDeCaixa` no Dashboard) — a RLS sozinha não protege quem
+acessa via Prisma.
+
+Criar/remover usuário só acontece pela rota `/api/usuarios/convidar`
+(usa a service key) — a tabela `perfis` não tem política de `INSERT`
+para o navegador de propósito. Não há e-mail transacional configurado:
+ao criar um usuário, a tela mostra uma senha temporária uma única vez
+para o dono repassar à pessoa; ela pode trocá-la depois pelo "esqueci
+minha senha" da tela de login.
+
+### Formas de Pagamento e Plano de Contas
+
+Cadastros-base para os lançamentos financeiros. Já vêm semeados com
+valores padrão para um negócio de serviços (salão/estúdio) na migration
+`004_financeiro_fase1.sql`:
+
+- **Formas de Pagamento:** Dinheiro, Pix, Cartão de Débito, Cartão de
+  Crédito, Boleto, Transferência Bancária.
+- **Plano de Contas:** Receita de Serviços, Impostos sobre Serviços
+  (Simples Nacional/ISS), Comissões de Profissionais, Produtos e
+  Materiais, Aluguel, Água/Luz/Internet, Marketing, Materiais de
+  Escritório, Manutenção, Outras Despesas Administrativas, Juros e
+  Tarifas Bancárias, Rendimentos Financeiros — cada uma já marcada com a
+  linha da DRE a que pertence (`natureza_dre`, ver `lib/dre.ts`), para a
+  Fase 3 conseguir montar a DRE automaticamente.
+
+Contas a Pagar e Contas a Receber já têm campos opcionais de categoria
+(Plano de Contas) e forma de pagamento — preenchê-los agora é o que vai
+alimentar a DRE com dados reais quando a Fase 3 chegar.
 
 ## Passo a passo para colocar no ar
 
