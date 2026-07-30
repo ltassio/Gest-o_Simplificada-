@@ -33,8 +33,20 @@ export default async function DashboardLayout({
         <Link href="/dashboard/agenda" className="sidebar-link">
           Agenda
         </Link>
+        <Link href="/dashboard/caixa" className="sidebar-link">
+          Caixa
+        </Link>
         <Link href="/dashboard/clientes" className="sidebar-link">
           Clientes
+        </Link>
+        <Link href="/dashboard/servicos" className="sidebar-link">
+          Serviços
+        </Link>
+        <Link href="/dashboard/profissionais" className="sidebar-link">
+          Profissionais
+        </Link>
+        <Link href="/dashboard/precificacao" className="sidebar-link">
+          Precificação
         </Link>
 
         <div className="sidebar-footer">
