@@ -31,14 +31,27 @@ model Tenant {
   fornecedores           Fornecedor[]
   contasPagar            ContaPagar[]
   contasReceber          ContaReceber[]
+  formasPagamento        FormaPagamento[]
+  planoContas            PlanoConta[]
 
   @@map("tenants")
 }
+
+// Papel do usuário dentro do tenant (Documento de Modelagem de Banco de
+// Dados v1.2, módulo Financeiro Fase 1): controla acesso ao módulo
+// Financeiro. "dono" = acesso total + gerencia usuários; "financeiro" =
+// acesso total ao Financeiro, não gerencia usuários; "operador" = não
+// enxerga o Financeiro (Contas a Pagar/Receber, Fornecedores, Plano de
+// Contas, Formas de Pagamento, DRE, Orçamento), só Agenda/Clientes/
+// Serviços/Caixa. Reforçado via RLS (papel_atual()), não só na UI.
+// Valores possíveis (checados no banco, não aqui): "dono" | "financeiro" | "operador".
 
 model Perfil {
   id        String   @id @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
   nome      String?
+  email     String?
+  papel     String   @default("dono")
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -178,18 +191,22 @@ model Fornecedor {
 }
 
 model ContaPagar {
-  id             String    @id @default(uuid()) @db.Uuid
-  tenantId       String    @map("tenant_id") @db.Uuid
-  fornecedorId   String    @map("fornecedor_id") @db.Uuid
-  descricao      String
-  valor          Decimal   @db.Decimal(10, 2)
-  dataVencimento DateTime  @map("data_vencimento") @db.Date
-  dataPagamento  DateTime? @map("data_pagamento") @db.Date
-  status         String    @default("a_pagar")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(uuid()) @db.Uuid
+  tenantId         String    @map("tenant_id") @db.Uuid
+  fornecedorId     String    @map("fornecedor_id") @db.Uuid
+  descricao        String
+  valor            Decimal   @db.Decimal(10, 2)
+  dataVencimento   DateTime  @map("data_vencimento") @db.Date
+  dataPagamento    DateTime? @map("data_pagamento") @db.Date
+  status           String    @default("a_pagar")
+  planoContaId     String?   @map("plano_conta_id") @db.Uuid
+  formaPagamentoId String?   @map("forma_pagamento_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
 
-  tenant     Tenant     @relation(fields: [tenantId], references: [id])
-  fornecedor Fornecedor @relation(fields: [fornecedorId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  fornecedor     Fornecedor      @relation(fields: [fornecedorId], references: [id])
+  planoConta     PlanoConta?     @relation(fields: [planoContaId], references: [id])
+  formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
 
   @@map("contas_pagar")
 }
@@ -203,10 +220,55 @@ model ContaReceber {
   dataVencimento   DateTime  @map("data_vencimento") @db.Date
   dataRecebimento  DateTime? @map("data_recebimento") @db.Date
   status           String    @default("a_receber")
+  planoContaId     String?   @map("plano_conta_id") @db.Uuid
+  formaPagamentoId String?   @map("forma_pagamento_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at")
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  cliente Cliente @relation(fields: [clienteId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  cliente        Cliente         @relation(fields: [clienteId], references: [id])
+  planoConta     PlanoConta?     @relation(fields: [planoContaId], references: [id])
+  formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
 
   @@map("contas_receber")
+}
+
+// =============================================================================
+// Financeiro (Fase 1) — Formas de Pagamento e Plano de Contas.
+// Adicionado em 30/07/2026 (Documento de Modelagem de Banco de Dados v1.2).
+// =============================================================================
+
+model FormaPagamento {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  nome      String
+  ativa     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  contasPagar   ContaPagar[]
+  contasReceber ContaReceber[]
+
+  @@map("formas_pagamento")
+}
+
+// natureza_dre classifica cada conta na linha correta da DRE (Fase 3):
+// receita_servicos, deducoes, custo_servicos, despesa_operacional,
+// despesa_financeira, receita_financeira, outras_receitas, outras_despesas.
+model PlanoConta {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  nome         String
+  tipo         String
+  naturezaDre  String   @map("natureza_dre")
+  contaPaiId   String?  @map("conta_pai_id") @db.Uuid
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  contaPai      PlanoConta?    @relation("PlanoContaHierarquia", fields: [contaPaiId], references: [id])
+  subcontas     PlanoConta[]   @relation("PlanoContaHierarquia")
+  contasPagar   ContaPagar[]
+  contasReceber ContaReceber[]
+
+  @@map("plano_contas")
 }
