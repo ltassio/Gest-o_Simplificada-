@@ -48,6 +48,15 @@ export default async function DashboardLayout({
         <Link href="/dashboard/precificacao" className="sidebar-link">
           Precificação
         </Link>
+        <Link href="/dashboard/fornecedores" className="sidebar-link">
+          Fornecedores
+        </Link>
+        <Link href="/dashboard/contas-a-pagar" className="sidebar-link">
+          Contas a Pagar
+        </Link>
+        <Link href="/dashboard/contas-a-receber" className="sidebar-link">
+          Contas a Receber
+        </Link>
 
         <div className="sidebar-footer">
           <div className="sidebar-user">{user.email}</div>

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getTenantIdForUserId } from "@/lib/auth";
 import { getResumoCaixa } from "@/lib/caixa";
+import { getFluxoDeCaixa, type FluxoCaixa } from "@/lib/fluxoCaixa";
+import FluxoCaixaChart from "./fluxo-caixa-chart";
 
 function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -30,13 +32,15 @@ export default async function DashboardHomePage() {
 
   let resumoMes = null;
   let resumoHoje = null;
+  let fluxoCaixa: FluxoCaixa | null = null;
   let erro: string | null = null;
 
   try {
     const tenantId = await getTenantIdForUserId(user.id);
-    [resumoMes, resumoHoje] = await Promise.all([
+    [resumoMes, resumoHoje, fluxoCaixa] = await Promise.all([
       getResumoCaixa(tenantId, inicioMes, agora),
       getResumoCaixa(tenantId, inicioHoje, fimHoje),
+      getFluxoDeCaixa(tenantId),
     ]);
   } catch {
     erro = "Não foi possível carregar os indicadores agora.";
@@ -74,6 +78,28 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
+      <h2 className="section-title">Fluxo de caixa projetado</h2>
+      {fluxoCaixa ? (
+        <div className="card" style={{ padding: 20 }}>
+          <FluxoCaixaChart buckets={fluxoCaixa.buckets} />
+          <p
+            style={{
+              marginTop: 12,
+              marginBottom: 0,
+              fontSize: 14,
+              color: fluxoCaixa.situacao === "liquidez" ? "var(--success)" : "var(--danger)",
+              fontWeight: 600,
+            }}
+          >
+            {fluxoCaixa.situacao === "liquidez"
+              ? `Liquidez: sobra ${formatarMoeda(fluxoCaixa.saldo_final)} considerando o que está em aberto.`
+              : `Déficit projetado de ${formatarMoeda(Math.abs(fluxoCaixa.saldo_final))} — as contas a pagar em aberto superam as a receber.`}
+          </p>
+        </div>
+      ) : (
+        <p className="empty-state">Sem dados de contas a pagar/receber ainda.</p>
+      )}
+
       <h2 className="section-title">Atalhos</h2>
       <div className="tile-grid">
         <Link href="/dashboard/agenda" className="tile">
@@ -99,6 +125,18 @@ export default async function DashboardHomePage() {
         <Link href="/dashboard/precificacao" className="tile">
           <div className="tile-title">Precificação</div>
           <div className="tile-desc">Calculadora de preço sugerido</div>
+        </Link>
+        <Link href="/dashboard/fornecedores" className="tile">
+          <div className="tile-title">Fornecedores</div>
+          <div className="tile-desc">Cadastro de fornecedores</div>
+        </Link>
+        <Link href="/dashboard/contas-a-pagar" className="tile">
+          <div className="tile-title">Contas a Pagar</div>
+          <div className="tile-desc">Lançar e acompanhar contas a pagar</div>
+        </Link>
+        <Link href="/dashboard/contas-a-receber" className="tile">
+          <div className="tile-title">Contas a Receber</div>
+          <div className="tile-desc">Lançar e acompanhar contas a receber</div>
         </Link>
       </div>
     </div>
