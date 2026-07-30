@@ -84,7 +84,7 @@ export default function ContasAReceberPage() {
           "id, cliente_id, descricao, valor, data_vencimento, data_recebimento, status, clientes ( nome ), plano_contas ( nome ), formas_pagamento ( nome )"
         )
         .order("data_vencimento"),
-      supabase.from("clientes").select("id, nome").order("nome"),
+      supabase.from("clientes").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("plano_contas").select("id, nome").eq("tipo", "receita").eq("ativo", true).order("nome"),
       supabase.from("formas_pagamento").select("id, nome").eq("ativa", true).order("nome"),
     ]);
