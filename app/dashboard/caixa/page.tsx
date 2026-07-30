@@ -102,9 +102,9 @@ export default function CaixaPage() {
         )
         .order("data_atendimento", { ascending: false })
         .limit(20),
-      supabase.from("clientes").select("id, nome").order("nome"),
+      supabase.from("clientes").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("profissionais").select("id, nome").eq("ativo", true).order("nome"),
-      supabase.from("servicos").select("id, nome, preco").order("nome"),
+      supabase.from("servicos").select("id, nome, preco").eq("tipo", "servico").order("nome"),
     ]);
 
     setPendentes((pend as unknown as AgendamentoPendente[]) ?? []);
