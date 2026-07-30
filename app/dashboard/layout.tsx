@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPerfilForUserId } from "@/lib/auth";
+import { podeVerFinanceiro, podeGerenciarUsuarios } from "@/lib/permissoes";
 import LogoutButton from "./logout-button";
 
 export default async function DashboardLayout({
@@ -18,6 +20,14 @@ export default async function DashboardLayout({
   if (!user) {
     redirect("/login");
   }
+
+  // Controle de acesso (módulo Financeiro, Fase 1): o papel decide o que
+  // aparece no menu. Isso é só usabilidade — a segurança de verdade está
+  // nas políticas de RLS (papel_atual()), então mesmo que alguém force a
+  // URL de uma tela escondida aqui, o banco continua bloqueando os dados.
+  const meuPerfil = await getPerfilForUserId(user.id);
+  const veFinanceiro = podeVerFinanceiro(meuPerfil.papel);
+  const gereUsuarios = podeGerenciarUsuarios(meuPerfil.papel);
 
   return (
     <div className="dashboard-shell">
@@ -48,15 +58,39 @@ export default async function DashboardLayout({
         <Link href="/dashboard/precificacao" className="sidebar-link">
           Precificação
         </Link>
-        <Link href="/dashboard/fornecedores" className="sidebar-link">
-          Fornecedores
-        </Link>
-        <Link href="/dashboard/contas-a-pagar" className="sidebar-link">
-          Contas a Pagar
-        </Link>
-        <Link href="/dashboard/contas-a-receber" className="sidebar-link">
-          Contas a Receber
-        </Link>
+
+        {veFinanceiro && (
+          <>
+            <div className="sidebar-section-label">Financeiro</div>
+            <Link href="/dashboard/contas-a-pagar" className="sidebar-link">
+              Lançamento · Contas a Pagar
+            </Link>
+            <Link href="/dashboard/contas-a-receber" className="sidebar-link">
+              Lançamento · Contas a Receber
+            </Link>
+            <Link href="/dashboard/financeiro/fluxo-caixa" className="sidebar-link">
+              Fluxo de Caixa
+            </Link>
+            <Link href="/dashboard/fornecedores" className="sidebar-link">
+              Fornecedores
+            </Link>
+            <Link href="/dashboard/financeiro/formas-pagamento" className="sidebar-link">
+              Formas de Pagamento
+            </Link>
+            <Link href="/dashboard/financeiro/plano-contas" className="sidebar-link">
+              Plano de Contas
+            </Link>
+          </>
+        )}
+
+        {gereUsuarios && (
+          <>
+            <div className="sidebar-section-label">Administração</div>
+            <Link href="/dashboard/usuarios" className="sidebar-link">
+              Usuários
+            </Link>
+          </>
+        )}
 
         <div className="sidebar-footer">
           <div className="sidebar-user">{user.email}</div>

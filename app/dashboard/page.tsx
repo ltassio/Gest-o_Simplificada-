@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getTenantIdForUserId } from "@/lib/auth";
+import { getPerfilForUserId } from "@/lib/auth";
 import { getResumoCaixa } from "@/lib/caixa";
 import { getFluxoDeCaixa, type FluxoCaixa } from "@/lib/fluxoCaixa";
+import { podeVerFinanceiro } from "@/lib/permissoes";
 import FluxoCaixaChart from "./fluxo-caixa-chart";
 
 function formatarMoeda(valor: number) {
@@ -34,14 +35,23 @@ export default async function DashboardHomePage() {
   let resumoHoje = null;
   let fluxoCaixa: FluxoCaixa | null = null;
   let erro: string | null = null;
+  let veFinanceiro = false;
 
   try {
-    const tenantId = await getTenantIdForUserId(user.id);
-    [resumoMes, resumoHoje, fluxoCaixa] = await Promise.all([
-      getResumoCaixa(tenantId, inicioMes, agora),
-      getResumoCaixa(tenantId, inicioHoje, fimHoje),
-      getFluxoDeCaixa(tenantId),
+    const meuPerfil = await getPerfilForUserId(user.id);
+    veFinanceiro = podeVerFinanceiro(meuPerfil.papel);
+
+    // getFluxoDeCaixa usa Prisma (conexão direta, não passa por RLS), por
+    // isso o filtro por papel precisa ser feito aqui no código — não dá
+    // para confiar só na política do banco quando o acesso é via Prisma.
+    const [resumo1, resumo2, fluxo] = await Promise.all([
+      getResumoCaixa(meuPerfil.tenantId, inicioMes, agora),
+      getResumoCaixa(meuPerfil.tenantId, inicioHoje, fimHoje),
+      veFinanceiro ? getFluxoDeCaixa(meuPerfil.tenantId) : Promise.resolve(null),
     ]);
+    resumoMes = resumo1;
+    resumoHoje = resumo2;
+    fluxoCaixa = fluxo;
   } catch {
     erro = "Não foi possível carregar os indicadores agora.";
   }
@@ -78,26 +88,30 @@ export default async function DashboardHomePage() {
         </div>
       )}
 
-      <h2 className="section-title">Fluxo de caixa projetado</h2>
-      {fluxoCaixa ? (
-        <div className="card" style={{ padding: 20 }}>
-          <FluxoCaixaChart buckets={fluxoCaixa.buckets} />
-          <p
-            style={{
-              marginTop: 12,
-              marginBottom: 0,
-              fontSize: 14,
-              color: fluxoCaixa.situacao === "liquidez" ? "var(--success)" : "var(--danger)",
-              fontWeight: 600,
-            }}
-          >
-            {fluxoCaixa.situacao === "liquidez"
-              ? `Liquidez: sobra ${formatarMoeda(fluxoCaixa.saldo_final)} considerando o que está em aberto.`
-              : `Déficit projetado de ${formatarMoeda(Math.abs(fluxoCaixa.saldo_final))} — as contas a pagar em aberto superam as a receber.`}
-          </p>
-        </div>
-      ) : (
-        <p className="empty-state">Sem dados de contas a pagar/receber ainda.</p>
+      {veFinanceiro && (
+        <>
+          <h2 className="section-title">Fluxo de caixa projetado</h2>
+          {fluxoCaixa ? (
+            <div className="card" style={{ padding: 20 }}>
+              <FluxoCaixaChart buckets={fluxoCaixa.buckets} />
+              <p
+                style={{
+                  marginTop: 12,
+                  marginBottom: 0,
+                  fontSize: 14,
+                  color: fluxoCaixa.situacao === "liquidez" ? "var(--success)" : "var(--danger)",
+                  fontWeight: 600,
+                }}
+              >
+                {fluxoCaixa.situacao === "liquidez"
+                  ? `Liquidez: sobra ${formatarMoeda(fluxoCaixa.saldo_final)} considerando o que está em aberto.`
+                  : `Déficit projetado de ${formatarMoeda(Math.abs(fluxoCaixa.saldo_final))} — as contas a pagar em aberto superam as a receber.`}
+              </p>
+            </div>
+          ) : (
+            <p className="empty-state">Sem dados de contas a pagar/receber ainda.</p>
+          )}
+        </>
       )}
 
       <h2 className="section-title">Atalhos</h2>
@@ -126,18 +140,34 @@ export default async function DashboardHomePage() {
           <div className="tile-title">Precificação</div>
           <div className="tile-desc">Calculadora de preço sugerido</div>
         </Link>
-        <Link href="/dashboard/fornecedores" className="tile">
-          <div className="tile-title">Fornecedores</div>
-          <div className="tile-desc">Cadastro de fornecedores</div>
-        </Link>
-        <Link href="/dashboard/contas-a-pagar" className="tile">
-          <div className="tile-title">Contas a Pagar</div>
-          <div className="tile-desc">Lançar e acompanhar contas a pagar</div>
-        </Link>
-        <Link href="/dashboard/contas-a-receber" className="tile">
-          <div className="tile-title">Contas a Receber</div>
-          <div className="tile-desc">Lançar e acompanhar contas a receber</div>
-        </Link>
+        {veFinanceiro && (
+          <>
+            <Link href="/dashboard/contas-a-pagar" className="tile">
+              <div className="tile-title">Contas a Pagar</div>
+              <div className="tile-desc">Lançar e acompanhar contas a pagar</div>
+            </Link>
+            <Link href="/dashboard/contas-a-receber" className="tile">
+              <div className="tile-title">Contas a Receber</div>
+              <div className="tile-desc">Lançar e acompanhar contas a receber</div>
+            </Link>
+            <Link href="/dashboard/financeiro/fluxo-caixa" className="tile">
+              <div className="tile-title">Fluxo de Caixa</div>
+              <div className="tile-desc">Projeção de entradas e saídas</div>
+            </Link>
+            <Link href="/dashboard/fornecedores" className="tile">
+              <div className="tile-title">Fornecedores</div>
+              <div className="tile-desc">Cadastro de fornecedores</div>
+            </Link>
+            <Link href="/dashboard/financeiro/formas-pagamento" className="tile">
+              <div className="tile-title">Formas de Pagamento</div>
+              <div className="tile-desc">Cadastro de formas de pagamento</div>
+            </Link>
+            <Link href="/dashboard/financeiro/plano-contas" className="tile">
+              <div className="tile-title">Plano de Contas</div>
+              <div className="tile-desc">Categorias para lançamentos e DRE</div>
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );
