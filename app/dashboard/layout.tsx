@@ -47,18 +47,25 @@ export default async function DashboardLayout({
         <Link href="/dashboard/caixa" className="sidebar-link">
           Caixa
         </Link>
-        <Link href="/dashboard/clientes" className="sidebar-link">
-          Clientes
-        </Link>
-        <Link href="/dashboard/servicos" className="sidebar-link">
-          Serviços
-        </Link>
-        <Link href="/dashboard/profissionais" className="sidebar-link">
-          Profissionais
-        </Link>
         <Link href="/dashboard/precificacao" className="sidebar-link">
           Precificação
         </Link>
+
+        <div className="sidebar-section-label">Produto e Serviço</div>
+        <Link href="/dashboard/servicos" className="sidebar-link">
+          Cadastro de Produto e Serviço
+        </Link>
+
+        <SidebarSection
+          title="Cadastro de Parceiro"
+          links={[
+            ...(veFinanceiro
+              ? [{ href: "/dashboard/fornecedores", label: "Fornecedor" }]
+              : []),
+            { href: "/dashboard/profissionais", label: "Profissional" },
+            { href: "/dashboard/clientes", label: "Cliente" },
+          ]}
+        />
 
         {veFinanceiro && (
           <SidebarSection
@@ -68,7 +75,6 @@ export default async function DashboardLayout({
               { href: "/dashboard/contas-a-receber", label: "Lançamento · Contas a Receber" },
               { href: "/dashboard/financeiro/fluxo-caixa", label: "Fluxo de Caixa" },
               { href: "/dashboard/financeiro/contas-bancarias", label: "Contas Bancárias" },
-              { href: "/dashboard/fornecedores", label: "Fornecedores" },
               { href: "/dashboard/financeiro/formas-pagamento", label: "Formas de Pagamento" },
               { href: "/dashboard/financeiro/plano-contas", label: "Plano de Contas" },
             ]}

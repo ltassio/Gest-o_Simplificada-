@@ -129,8 +129,8 @@ export default async function DashboardHomePage() {
           <div className="tile-desc">Consultar e cadastrar clientes</div>
         </Link>
         <Link href="/dashboard/servicos" className="tile">
-          <div className="tile-title">Serviços</div>
-          <div className="tile-desc">Catálogo de serviços e preços</div>
+          <div className="tile-title">Produtos e Serviços</div>
+          <div className="tile-desc">Catálogo de produtos e serviços e preços</div>
         </Link>
         <Link href="/dashboard/profissionais" className="tile">
           <div className="tile-title">Profissionais</div>
