@@ -35,77 +35,66 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={styles.main}>
-      <form onSubmit={handleSubmit} style={styles.card}>
-        <h1 style={styles.title}>Gestão Simples</h1>
-        <p style={styles.subtitle}>Entre com seu e-mail e senha</p>
+    <main className="page-center">
+      <form onSubmit={handleSubmit} className="card" style={{ width: 360 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 18,
+          }}
+        >
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 999,
+              background: "var(--accent)",
+              boxShadow: "0 0 12px var(--accent)",
+            }}
+          />
+          <h1 className="card-title" style={{ margin: 0 }}>
+            Gestão Simples
+          </h1>
+        </div>
+        <p className="card-subtitle">Entre com seu e-mail e senha</p>
 
-        <label style={styles.label}>
+        {erro && <p className="alert-error">{erro}</p>}
+
+        <label className="field">
           E-mail
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
             autoComplete="email"
+            placeholder="voce@exemplo.com"
           />
         </label>
 
-        <label style={styles.label}>
+        <label className="field">
           Senha
           <input
             type="password"
             required
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            style={styles.input}
             autoComplete="current-password"
+            placeholder="••••••••"
           />
         </label>
 
-        {erro && <p style={styles.erro}>{erro}</p>}
-
-        <button type="submit" disabled={carregando} style={styles.botao}>
+        <button
+          type="submit"
+          disabled={carregando}
+          className="btn btn-primary btn-block"
+          style={{ marginTop: 8 }}
+        >
           {carregando ? "Entrando..." : "Entrar"}
         </button>
       </form>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "sans-serif",
-    background: "#f5f5f5",
-  },
-  card: {
-    background: "#fff",
-    padding: 32,
-    borderRadius: 8,
-    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-    width: 320,
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
-  title: { margin: 0 },
-  subtitle: { margin: 0, color: "#666", fontSize: 14 },
-  label: { display: "flex", flexDirection: "column", gap: 4, fontSize: 14 },
-  input: { padding: 8, borderRadius: 4, border: "1px solid #ccc", fontSize: 14 },
-  erro: { color: "#c0392b", fontSize: 13, margin: 0 },
-  botao: {
-    marginTop: 8,
-    padding: "10px 16px",
-    borderRadius: 4,
-    border: "none",
-    background: "#111",
-    color: "#fff",
-    fontSize: 14,
-    cursor: "pointer",
-  },
-};
