@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
               "Configure os parâmetros de precificação (custo fixo mensal, horas produtivas, imposto, margem) antes de calcular preços.",
           },
         },
-        { status: 400 }
+        // 422, não 400: os dados enviados são válidos, o problema é uma
+        // pré-condição de negócio ausente (Documentação da API v1.0, Seção 3.4).
+        { status: 422 }
       );
     }
 
