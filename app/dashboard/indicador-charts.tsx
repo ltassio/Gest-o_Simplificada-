@@ -171,6 +171,12 @@ export function ProfissionaisChart({ ranking }: { ranking: ResumoPorProfissional
     receita: p.total_cobrado,
     comissao: p.total_comissao,
   }));
+  // domain com folga de 25% acima do maior valor (mesmo problema já
+  // encontrado no gráfico de Clientes: sem folga, a barra do maior valor
+  // encosta na borda e o rótulo em LabelList "right" fica cortado — visto
+  // em QA de produção com "R$ 379,12" cortado para "R$ 379,1").
+  const maxProfissionais = Math.max(1, ...data.map((d) => Math.max(d.receita, d.comissao)));
+  const domainMaxProfissionais = Math.max(1, Math.ceil(maxProfissionais * 1.25));
 
   return (
     <div style={{ width: "100%", height: Math.max(160, data.length * 64) }}>
@@ -183,7 +189,7 @@ export function ProfissionaisChart({ ranking }: { ranking: ResumoPorProfissional
           barGap={4}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-          <XAxis type="number" hide />
+          <XAxis type="number" domain={[0, domainMaxProfissionais]} hide />
           <YAxis
             type="category"
             dataKey="nome"
@@ -245,6 +251,11 @@ export function ServicosChart({ servicos }: { servicos: ServicoMaisVendido[] }) 
     receita: s.receita,
     color: [CHART_5, CHART_1, CHART_6, CHART_3, CHART_2][i % 5],
   }));
+  // mesma folga de 25% aplicada em Clientes/Profissionais, por precaução
+  // (o mesmo corte de rótulo já apareceu em mais de um gráfico sem domain
+  // explícito).
+  const maxServicos = Math.max(1, ...data.map((d) => d.receita));
+  const domainMaxServicos = Math.max(1, Math.ceil(maxServicos * 1.25));
 
   return (
     <div style={{ width: "100%", height: Math.max(160, data.length * 56) }}>
@@ -256,7 +267,7 @@ export function ServicosChart({ servicos }: { servicos: ServicoMaisVendido[] }) 
           barCategoryGap={18}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-          <XAxis type="number" hide />
+          <XAxis type="number" domain={[0, domainMaxServicos]} hide />
           <YAxis
             type="category"
             dataKey="nome"
