@@ -145,6 +145,7 @@ export default function CaixaPage() {
   const [tipoMovimento, setTipoMovimento] = useState<"suprimento" | "sangria" | "despesa" | null>(null);
   const [valorMovimento, setValorMovimento] = useState("");
   const [descricaoMovimento, setDescricaoMovimento] = useState("");
+  const [formaPagamentoMovimentoId, setFormaPagamentoMovimentoId] = useState("");
   const [lancandoMovimento, setLancandoMovimento] = useState(false);
 
   const [mostrarResumo, setMostrarResumo] = useState(false);
@@ -290,6 +291,7 @@ export default function CaixaPage() {
           tipo: tipoMovimento,
           valor: Number(valorMovimento || 0),
           descricao: descricaoMovimento || undefined,
+          forma_pagamento_id: tipoMovimento === "despesa" && formaPagamentoMovimentoId ? formaPagamentoMovimentoId : undefined,
         }),
       });
       const json = await resp.json();
@@ -298,6 +300,7 @@ export default function CaixaPage() {
       setTipoMovimento(null);
       setValorMovimento("");
       setDescricaoMovimento("");
+      setFormaPagamentoMovimentoId("");
       await carregarTudo();
     } catch (err: any) {
       setErro(err.message);
@@ -707,6 +710,26 @@ export default function CaixaPage() {
                         placeholder="Opcional"
                       />
                     </label>
+                    {tipoMovimento === "despesa" && (
+                      <label className="field">
+                        Forma de pagamento
+                        <select
+                          value={formaPagamentoMovimentoId}
+                          onChange={(e) => setFormaPagamentoMovimentoId(e.target.value)}
+                        >
+                          <option value="">Dinheiro (saiu do caixa físico)</option>
+                          {formasPagamento.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.nome}
+                            </option>
+                          ))}
+                        </select>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          Se a despesa não foi paga em dinheiro (ex.: cartão, pix), selecione a forma usada — assim
+                          ela não é descontada do valor esperado na gaveta.
+                        </span>
+                      </label>
+                    )}
                     <div style={{ display: "flex", gap: 10 }}>
                       <button type="submit" className="btn btn-primary" disabled={lancandoMovimento}>
                         {lancandoMovimento ? "Registrando..." : "Confirmar"}
@@ -718,6 +741,7 @@ export default function CaixaPage() {
                           setTipoMovimento(null);
                           setValorMovimento("");
                           setDescricaoMovimento("");
+                          setFormaPagamentoMovimentoId("");
                         }}
                       >
                         Cancelar
