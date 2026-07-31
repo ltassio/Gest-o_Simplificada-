@@ -81,7 +81,7 @@ export function AgendaChart({ resumo }: { resumo: AgendaResumo }) {
                 <Cell key={d.name} fill={d.color} />
               ))}
             </Pie>
-            <Tooltip contentStyle={tooltipStyle} />
+            <Tooltip contentStyle={tooltipStyle} wrapperStyle={{ zIndex: 20 }} />
           </PieChart>
         </ResponsiveContainer>
         <div className="donut-center">
@@ -140,8 +140,12 @@ export function ClientesChart({ resumo }: { resumo: ClientesResumo }) {
             tickLine={false}
             axisLine={false}
           />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--bg-elevated-2)" }} />
-          <Bar dataKey="valor" radius={[0, 6, 6, 0]} maxBarSize={28}>
+          <Tooltip
+            formatter={(value: number) => [value, "Clientes"]}
+            contentStyle={tooltipStyle}
+            cursor={{ fill: "var(--bg-elevated-2)" }}
+          />
+          <Bar dataKey="valor" name="Clientes" radius={[0, 6, 6, 0]} maxBarSize={28}>
             {data.map((d) => (
               <Cell key={d.name} fill={d.color} />
             ))}
