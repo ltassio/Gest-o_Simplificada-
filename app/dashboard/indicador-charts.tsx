@@ -184,7 +184,7 @@ export function ProfissionaisChart({ ranking }: { ranking: ResumoPorProfissional
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 4, right: 56, left: 4, bottom: 4 }}
+          margin={{ top: 4, right: 72, left: 4, bottom: 4 }}
           barCategoryGap={22}
           barGap={4}
         >
