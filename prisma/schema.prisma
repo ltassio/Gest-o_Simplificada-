@@ -34,6 +34,9 @@ model Tenant {
   formasPagamento        FormaPagamento[]
   planoContas            PlanoConta[]
   contasBancarias        ContaBancaria[]
+  caixaSessoes           CaixaSessao[]
+  caixaMovimentos        CaixaMovimento[]
+  vendas                 Venda[]
 
   @@map("tenants")
 }
@@ -74,6 +77,7 @@ model Cliente {
   agendamentos  Agendamento[]
   atendimentos  Atendimento[]
   contasReceber ContaReceber[]
+  vendas        Venda[]
 
   @@map("clientes")
 }
@@ -149,9 +153,12 @@ model Atendimento {
   id                          String   @id @default(uuid()) @db.Uuid
   tenantId                    String   @map("tenant_id") @db.Uuid
   agendamentoId               String?  @unique @map("agendamento_id") @db.Uuid
+  vendaId                     String?  @map("venda_id") @db.Uuid
   clienteId                   String   @map("cliente_id") @db.Uuid
   profissionalId              String   @map("profissional_id") @db.Uuid
   servicoId                   String   @map("servico_id") @db.Uuid
+  quantidade                  Int      @default(1)
+  valorUnitario               Decimal  @map("valor_unitario") @db.Decimal(10, 2)
   valorCobrado                Decimal  @map("valor_cobrado") @db.Decimal(10, 2)
   percentualComissaoAplicado  Decimal  @map("percentual_comissao_aplicado") @db.Decimal(5, 2)
   valorComissao               Decimal  @map("valor_comissao") @db.Decimal(10, 2)
@@ -161,11 +168,92 @@ model Atendimento {
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id])
   agendamento  Agendamento? @relation(fields: [agendamentoId], references: [id])
+  venda        Venda?       @relation(fields: [vendaId], references: [id])
   cliente      Cliente      @relation(fields: [clienteId], references: [id])
   profissional Profissional @relation(fields: [profissionalId], references: [id])
   servico      Servico      @relation(fields: [servicoId], references: [id])
 
   @@map("atendimentos")
+}
+
+// =============================================================================
+// Caixa como PDV — sessão de caixa (abrir/fechar dia, sangria, suprimento,
+// despesa) e vendas com carrinho multi-item. Adicionado em 31/07/2026 a
+// pedido do usuário (inspirado num PDV de outro sistema). Ver comentário
+// completo em prisma/migrations_manual/007_caixa_pdv.sql — resumo das
+// decisões: (1) só pode existir 1 CaixaSessao com status "aberto" por
+// tenant por vez (índice único parcial no banco); (2) Venda é o cabeçalho
+// do carrinho, cada item vendido continua sendo 1 linha em Atendimento
+// (agora com vendaId, quantidade e valorUnitario) — assim os relatórios/
+// dashboard que já somam atendimentos.valor_cobrado continuam funcionando
+// sem mudança; (3) valorCobrado de cada item é sempre o valor BRUTO
+// (já com o desconto proporcional da venda aplicado, mas ANTES de tirar a
+// comissão do profissional) — a visão líquida (valorEstudio) é tratada só
+// em relatórios/dashboard, nunca como o "Total" da venda no PDV.
+// =============================================================================
+
+model CaixaSessao {
+  id                        String    @id @default(uuid()) @db.Uuid
+  tenantId                  String    @map("tenant_id") @db.Uuid
+  numero                    Int
+  status                    String    @default("aberto")
+  valorAbertura              Decimal   @default(0) @map("valor_abertura") @db.Decimal(10, 2)
+  valorFechamentoInformado  Decimal?  @map("valor_fechamento_informado") @db.Decimal(10, 2)
+  valorFechamentoCalculado  Decimal?  @map("valor_fechamento_calculado") @db.Decimal(10, 2)
+  abertoPorId               String?   @map("aberto_por_id") @db.Uuid
+  fechadoPorId              String?   @map("fechado_por_id") @db.Uuid
+  observacao                String?
+  dataAbertura               DateTime  @default(now()) @map("data_abertura")
+  dataFechamento             DateTime? @map("data_fechamento")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  movimentos CaixaMovimento[]
+  vendas     Venda[]
+
+  @@map("caixa_sessoes")
+}
+
+model CaixaMovimento {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  sessaoId          String   @map("sessao_id") @db.Uuid
+  tipo              String
+  valor             Decimal  @db.Decimal(10, 2)
+  descricao         String?
+  formaPagamentoId  String?  @map("forma_pagamento_id") @db.Uuid
+  criadoPorId       String?  @map("criado_por_id") @db.Uuid
+  dataMovimento     DateTime @default(now()) @map("data_movimento")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  sessao         CaixaSessao     @relation(fields: [sessaoId], references: [id])
+  formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
+
+  @@map("caixa_movimentos")
+}
+
+model Venda {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  sessaoId          String   @map("sessao_id") @db.Uuid
+  numero            Int
+  clienteId         String   @map("cliente_id") @db.Uuid
+  formaPagamentoId  String   @map("forma_pagamento_id") @db.Uuid
+  subtotal          Decimal  @default(0) @db.Decimal(10, 2)
+  desconto          Decimal  @default(0) @db.Decimal(10, 2)
+  total             Decimal  @default(0) @db.Decimal(10, 2)
+  status            String   @default("paga")
+  dataVenda         DateTime @default(now()) @map("data_venda")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  sessao         CaixaSessao     @relation(fields: [sessaoId], references: [id])
+  cliente        Cliente         @relation(fields: [clienteId], references: [id])
+  formaPagamento FormaPagamento  @relation(fields: [formaPagamentoId], references: [id])
+  itens          Atendimento[]
+
+  @@map("vendas")
 }
 
 // =============================================================================
@@ -241,15 +329,18 @@ model ContaReceber {
 // =============================================================================
 
 model FormaPagamento {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  nome      String
-  ativa     Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  nome                String
+  ativa               Boolean  @default(true)
+  contaNoCaixaFisico  Boolean  @default(true) @map("conta_no_caixa_fisico")
+  createdAt           DateTime @default(now()) @map("created_at")
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  contasPagar   ContaPagar[]
-  contasReceber ContaReceber[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  contasPagar     ContaPagar[]
+  contasReceber   ContaReceber[]
+  vendas          Venda[]
+  caixaMovimentos CaixaMovimento[]
 
   @@map("formas_pagamento")
 }
