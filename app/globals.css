@@ -497,6 +497,10 @@ h3 {
   transform: translate(-50%, -50%);
   text-align: center;
   pointer-events: none;
+  /* z-index baixo de propósito: o tooltip do recharts (wrapperStyle
+     zIndex: 20) precisa aparecer por cima disso ao passar o mouse numa
+     fatia — sem isso os dois textos ficavam sobrepostos e ilegíveis. */
+  z-index: 1;
 }
 
 .donut-center-value {
