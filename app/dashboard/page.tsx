@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilForUserId } from "@/lib/auth";
@@ -113,66 +112,6 @@ export default async function DashboardHomePage() {
           )}
         </>
       )}
-
-      <h2 className="section-title">Atalhos</h2>
-      <div className="tile-grid">
-        <Link href="/dashboard/agenda" className="tile">
-          <div className="tile-title">Agenda</div>
-          <div className="tile-desc">Ver e criar agendamentos do dia</div>
-        </Link>
-        <Link href="/dashboard/caixa" className="tile">
-          <div className="tile-title">Caixa</div>
-          <div className="tile-desc">Registrar atendimentos e comissões</div>
-        </Link>
-        <Link href="/dashboard/clientes" className="tile">
-          <div className="tile-title">Clientes</div>
-          <div className="tile-desc">Consultar e cadastrar clientes</div>
-        </Link>
-        <Link href="/dashboard/servicos" className="tile">
-          <div className="tile-title">Produtos e Serviços</div>
-          <div className="tile-desc">Catálogo de produtos e serviços e preços</div>
-        </Link>
-        <Link href="/dashboard/profissionais" className="tile">
-          <div className="tile-title">Profissionais</div>
-          <div className="tile-desc">Equipe e percentual de comissão</div>
-        </Link>
-        <Link href="/dashboard/precificacao" className="tile">
-          <div className="tile-title">Precificação</div>
-          <div className="tile-desc">Calculadora de preço sugerido</div>
-        </Link>
-        {veFinanceiro && (
-          <>
-            <Link href="/dashboard/contas-a-pagar" className="tile">
-              <div className="tile-title">Contas a Pagar</div>
-              <div className="tile-desc">Lançar e acompanhar contas a pagar</div>
-            </Link>
-            <Link href="/dashboard/contas-a-receber" className="tile">
-              <div className="tile-title">Contas a Receber</div>
-              <div className="tile-desc">Lançar e acompanhar contas a receber</div>
-            </Link>
-            <Link href="/dashboard/financeiro/fluxo-caixa" className="tile">
-              <div className="tile-title">Fluxo de Caixa</div>
-              <div className="tile-desc">Projeção de entradas e saídas</div>
-            </Link>
-            <Link href="/dashboard/financeiro/contas-bancarias" className="tile">
-              <div className="tile-title">Contas Bancárias</div>
-              <div className="tile-desc">Cadastro e saldo das contas de banco</div>
-            </Link>
-            <Link href="/dashboard/fornecedores" className="tile">
-              <div className="tile-title">Fornecedores</div>
-              <div className="tile-desc">Cadastro de fornecedores</div>
-            </Link>
-            <Link href="/dashboard/financeiro/formas-pagamento" className="tile">
-              <div className="tile-title">Formas de Pagamento</div>
-              <div className="tile-desc">Cadastro de formas de pagamento</div>
-            </Link>
-            <Link href="/dashboard/financeiro/plano-contas" className="tile">
-              <div className="tile-title">Plano de Contas</div>
-              <div className="tile-desc">Categorias para lançamentos e DRE</div>
-            </Link>
-          </>
-        )}
-      </div>
     </div>
   );
 }

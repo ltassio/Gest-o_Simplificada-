@@ -47,9 +47,6 @@ export default async function DashboardLayout({
         <Link href="/dashboard/caixa" className="sidebar-link">
           Caixa
         </Link>
-        <Link href="/dashboard/precificacao" className="sidebar-link">
-          Precificação
-        </Link>
 
         <div className="sidebar-section-label">Produto e Serviço</div>
         <Link href="/dashboard/servicos" className="sidebar-link">
@@ -77,6 +74,7 @@ export default async function DashboardLayout({
               { href: "/dashboard/financeiro/contas-bancarias", label: "Contas Bancárias" },
               { href: "/dashboard/financeiro/formas-pagamento", label: "Formas de Pagamento" },
               { href: "/dashboard/financeiro/plano-contas", label: "Plano de Contas" },
+              { href: "/dashboard/precificacao", label: "Precificação" },
             ]}
           />
         )}
