@@ -83,3 +83,94 @@ export async function getResumoCaixa(
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+// =============================================================================
+// Resumo de uma Sessão de Caixa (PDV, adicionado em 31/07/2026) — usado pelo
+// botão "Resumo" enquanto o caixa está aberto e para calcular o valor
+// esperado ao fechar o caixa (POST /api/caixa/sessoes/:id/fechar).
+//
+// Só "Dinheiro" (formaPagamento.contaNoCaixaFisico = true) entra na conta do
+// caixa físico: vendas pagas no cartão/pix/boleto aumentam o faturamento do
+// dia mas não passam pela gaveta do caixa, então não devem ser somadas nem
+// subtraídas do valor esperado em espécie. Sangria e suprimento são sempre
+// movimentação física (por definição, é dinheiro saindo/entrando na gaveta),
+// então sempre contam.
+// =============================================================================
+export interface ResumoSessaoCaixa {
+  sessao_id: string;
+  valor_abertura: number;
+  total_vendas: number;
+  total_vendas_caixa_fisico: number;
+  quantidade_vendas: number;
+  total_suprimento: number;
+  total_sangria: number;
+  total_despesa: number;
+  total_despesa_caixa_fisico: number;
+  valor_esperado_caixa_fisico: number;
+}
+
+export async function getResumoSessaoCaixa(
+  tenantId: string,
+  sessaoId: string
+): Promise<ResumoSessaoCaixa> {
+  const sessao = await prisma.caixaSessao.findFirst({ where: { id: sessaoId, tenantId } });
+  if (!sessao) {
+    throw new Error("Sessão de caixa não encontrada.");
+  }
+
+  const [vendas, movimentos] = await Promise.all([
+    prisma.venda.findMany({
+      where: { tenantId, sessaoId, status: "paga" },
+      include: { formaPagamento: { select: { contaNoCaixaFisico: true } } },
+    }),
+    prisma.caixaMovimento.findMany({
+      where: { tenantId, sessaoId },
+      include: { formaPagamento: { select: { contaNoCaixaFisico: true } } },
+    }),
+  ]);
+
+  let totalVendas = 0;
+  let totalVendasCaixaFisico = 0;
+  for (const v of vendas) {
+    const total = Number(v.total);
+    totalVendas += total;
+    if (v.formaPagamento.contaNoCaixaFisico) {
+      totalVendasCaixaFisico += total;
+    }
+  }
+
+  let totalSuprimento = 0;
+  let totalSangria = 0;
+  let totalDespesa = 0;
+  let totalDespesaCaixaFisico = 0;
+  for (const m of movimentos) {
+    const valor = Number(m.valor);
+    if (m.tipo === "suprimento") totalSuprimento += valor;
+    else if (m.tipo === "sangria") totalSangria += valor;
+    else if (m.tipo === "despesa") {
+      totalDespesa += valor;
+      // Sem forma de pagamento informada, assume que saiu do caixa físico.
+      if (!m.formaPagamento || m.formaPagamento.contaNoCaixaFisico) {
+        totalDespesaCaixaFisico += valor;
+      }
+    }
+  }
+
+  const valorAbertura = Number(sessao.valorAbertura);
+  const valorEsperadoCaixaFisico = round2(
+    valorAbertura + totalVendasCaixaFisico + totalSuprimento - totalSangria - totalDespesaCaixaFisico
+  );
+
+  return {
+    sessao_id: sessaoId,
+    valor_abertura: round2(valorAbertura),
+    total_vendas: round2(totalVendas),
+    total_vendas_caixa_fisico: round2(totalVendasCaixaFisico),
+    quantidade_vendas: vendas.length,
+    total_suprimento: round2(totalSuprimento),
+    total_sangria: round2(totalSangria),
+    total_despesa: round2(totalDespesa),
+    total_despesa_caixa_fisico: round2(totalDespesaCaixaFisico),
+    valor_esperado_caixa_fisico: valorEsperadoCaixaFisico,
+  };
+}
