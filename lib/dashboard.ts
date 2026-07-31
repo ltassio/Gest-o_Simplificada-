@@ -109,20 +109,21 @@ export async function getServicosMaisVendidos(
   fim: Date,
   limite = 5
 ): Promise<ServicoMaisVendido[]> {
-  // Cast para any[] feito DEPOIS do await (não como anotação do const): se a
-  // gente anota `const grupos: any[] = await prisma...groupBy(...)`, o TS usa
-  // esse tipo esperado para inferir os genéricos do próprio groupBy, e é
-  // exatamente isso que quebra o build (ele passa a exigir que o objeto de
-  // argumento também seja compatível com "any[]"). Fazendo o cast fora, o
-  // groupBy é checado com seu tipo normal e só o resultado vira any[] para
-  // simplificar os .map/.sort encadeados abaixo.
+  // Bug conhecido do Prisma Client (5.18.x): combinar _count + _sum num
+  // groupBy faz o TS tentar unificar o tipo do argumento com "any[]" (erro
+  // "is missing the following properties from type 'any[]': length, pop,
+  // push..."), mesmo com orderBy presente. orderBy sozinho não resolve — já
+  // tentamos (falhou de novo no deploy). O jeito de sair da roda-viva do
+  // typechecker aqui é castar o argumento inteiro para "any": o Prisma em
+  // runtime não liga para o tipo, só o compilador é que trava nessa
+  // combinação específica de agregações.
   const grupos = (await prisma.atendimento.groupBy({
     by: ["servicoId"],
     where: { tenantId, dataAtendimento: { gte: inicio, lte: fim } },
     _count: { _all: true },
     _sum: { valorCobrado: true },
     orderBy: { servicoId: "asc" },
-  })) as any[];
+  } as any)) as any[];
 
   if (grupos.length === 0) return [];
 
