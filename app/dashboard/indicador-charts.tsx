@@ -36,6 +36,19 @@ function truncar(nome: string, max = 16) {
   return nome.length > max ? `${nome.slice(0, max - 1)}…` : nome;
 }
 
+// REGRA DE TEMA (bug encontrado em produção em 31/07/2026): no recharts,
+// <Tooltip contentStyle={...}> só estiliza o FUNDO/borda do balão — o texto
+// do título (label) e das linhas de valor (itens) usam props separadas
+// (labelStyle / itemStyle) que o recharts preenche sozinho com preto por
+// padrão se você não passar nada. Resultado: texto preto ilegível em cima
+// do fundo escuro do tema, mesmo com contentStyle "certo". Por isso os três
+// objetos abaixo sempre andam juntos em qualquer <Tooltip> do projeto — se
+// um dia o tema mudar de escuro para claro (ou os valores de --bg-elevated-2
+// /--text mudarem), essas variáveis CSS já resolvem sozinhas porque a cor do
+// texto aqui é sempre a mesma variável de texto do tema (nunca uma cor fixa
+// tipo "#000" ou "#fff"), então ela automaticamente fica "oposta" ao fundo.
+// Sempre que adicionar um novo gráfico com <Tooltip>, passe os três juntos:
+// contentStyle + labelStyle + itemStyle.
 const tooltipStyle = {
   background: "var(--bg-elevated-2)",
   border: "1px solid var(--border)",
@@ -43,6 +56,8 @@ const tooltipStyle = {
   color: "var(--text)",
   fontSize: 13,
 };
+const tooltipLabelStyle = { color: "var(--text)", fontWeight: 600, marginBottom: 4 };
+const tooltipItemStyle = { color: "var(--text)" };
 
 const valorLabelStyle = { fill: "var(--text)", fontSize: 12, fontWeight: 600 };
 const nomeLabelStyle = { fill: "var(--text-muted)", fontSize: 12 };
@@ -81,7 +96,12 @@ export function AgendaChart({ resumo }: { resumo: AgendaResumo }) {
                 <Cell key={d.name} fill={d.color} />
               ))}
             </Pie>
-            <Tooltip contentStyle={tooltipStyle} wrapperStyle={{ zIndex: 20 }} />
+            <Tooltip
+              contentStyle={tooltipStyle}
+              labelStyle={tooltipLabelStyle}
+              itemStyle={tooltipItemStyle}
+              wrapperStyle={{ zIndex: 20 }}
+            />
           </PieChart>
         </ResponsiveContainer>
         <div className="donut-center">
@@ -143,6 +163,8 @@ export function ClientesChart({ resumo }: { resumo: ClientesResumo }) {
           <Tooltip
             formatter={(value: number) => [value, "Clientes"]}
             contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
             cursor={{ fill: "var(--bg-elevated-2)" }}
           />
           <Bar dataKey="valor" name="Clientes" radius={[0, 6, 6, 0]} maxBarSize={28}>
@@ -203,6 +225,8 @@ export function ProfissionaisChart({ ranking }: { ranking: ResumoPorProfissional
             formatter={(value: number, name: string) => [formatarMoeda(value), name]}
             labelFormatter={(_, entries) => entries?.[0]?.payload?.nomeCompleto ?? ""}
             contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
             cursor={{ fill: "var(--bg-elevated-2)" }}
           />
           <Bar dataKey="receita" name="Receita" fill={CHART_1} radius={[0, 6, 6, 0]} maxBarSize={16}>
@@ -281,6 +305,8 @@ export function ServicosChart({ servicos }: { servicos: ServicoMaisVendido[] }) 
             formatter={(value: number) => [formatarMoeda(value), "Receita"]}
             labelFormatter={(_, entries) => entries?.[0]?.payload?.nomeCompleto ?? ""}
             contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
             cursor={{ fill: "var(--bg-elevated-2)" }}
           />
           <Bar dataKey="receita" radius={[0, 6, 6, 0]} maxBarSize={24}>

@@ -34,6 +34,14 @@ export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] })
             tickFormatter={(v) => formatarMoeda(Number(v))}
             width={90}
           />
+          {/* REGRA DE TEMA: contentStyle só estiliza o fundo do balão do
+              Tooltip do recharts — o texto do título e das linhas de valor
+              usa labelStyle/itemStyle à parte, que o recharts preenche com
+              preto por padrão se não forem passados (bug real encontrado em
+              produção em 31/07/2026: texto ilegível sobre o fundo escuro).
+              Sempre que mexer aqui ou mudar o tema, mantenha os três juntos
+              usando as variáveis de cor do tema (nunca uma cor fixa), assim
+              o contraste continua correto sozinho. */}
           <Tooltip
             formatter={(value: number, name: string) => [formatarMoeda(value), name]}
             contentStyle={{
@@ -42,6 +50,8 @@ export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] })
               borderRadius: 8,
               color: "var(--text)",
             }}
+            labelStyle={{ color: "var(--text)", fontWeight: 600, marginBottom: 4 }}
+            itemStyle={{ color: "var(--text)" }}
           />
           <Legend />
           <Bar dataKey="total_a_receber" name="A Receber" fill="var(--success)" radius={[4, 4, 0, 0]} />
