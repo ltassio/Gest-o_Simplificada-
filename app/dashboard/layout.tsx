@@ -48,10 +48,10 @@ export default async function DashboardLayout({
           Caixa
         </Link>
 
-        <div className="sidebar-section-label">Produto e Serviço</div>
-        <Link href="/dashboard/servicos" className="sidebar-link">
-          Cadastro de Produto e Serviço
-        </Link>
+        <SidebarSection
+          title="Produto e Serviço"
+          links={[{ href: "/dashboard/servicos", label: "Cadastro de Produto e Serviço" }]}
+        />
 
         <SidebarSection
           title="Cadastro de Parceiro"
@@ -80,12 +80,10 @@ export default async function DashboardLayout({
         )}
 
         {gereUsuarios && (
-          <>
-            <div className="sidebar-section-label">Administração</div>
-            <Link href="/dashboard/usuarios" className="sidebar-link">
-              Usuários
-            </Link>
-          </>
+          <SidebarSection
+            title="Administração"
+            links={[{ href: "/dashboard/usuarios", label: "Usuários" }]}
+          />
         )}
 
         <div className="sidebar-footer">
