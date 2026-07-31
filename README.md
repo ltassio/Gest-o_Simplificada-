@@ -17,7 +17,7 @@ app/dashboard/clientes/page.tsx          → lista + cadastro de clientes, statu
 app/dashboard/servicos/page.tsx          → catálogo de produtos e serviços (tipo, duração, custo, preço)
 app/dashboard/profissionais/page.tsx     → equipe + percentual de comissão
 app/dashboard/precificacao/page.tsx      → configuração + calculadora de preço sugerido
-app/dashboard/caixa/page.tsx             → lançamento de atendimentos (agendados e avulsos)
+app/dashboard/caixa/page.tsx             → Caixa como PDV: sessão do dia (abrir/fechar, sangria, suprimento, despesa) + venda com carrinho multi-item
 app/dashboard/fornecedores/page.tsx      → cadastro de fornecedores (nome, telefone, e-mail, CNPJ)
 app/dashboard/contas-a-pagar/page.tsx    → lançamento, status (A Pagar/Paga/Vencida) e visão de atraso por fornecedor
 app/dashboard/contas-a-receber/page.tsx  → lançamento, status (A Receber/Recebida/Vencida) e visão de atraso por cliente
@@ -27,9 +27,13 @@ lib/supabase/client.ts                   → cliente Supabase para o navegador
 lib/supabase/server.ts                   → cliente Supabase para Server Components
 lib/tenant.ts                            → descobre o tenant_id do usuário logado (necessário em todo insert)
 app/api/precificacao/calcular/route.ts   → POST cálculo de preço sugerido
-app/api/caixa/atendimentos/route.ts      → POST registro de atendimento (split de comissão)
-app/api/caixa/resumo/route.ts            → GET resumo de caixa por período
-lib/caixa.ts                             → agregação do resumo de caixa (usada pela API Route e pelo Dashboard)
+app/api/caixa/atendimentos/route.ts      → POST registro de atendimento único (legado, mantido por compatibilidade — o Caixa agora usa /api/caixa/vendas)
+app/api/caixa/resumo/route.ts            → GET resumo de caixa por período (usado pelo Dashboard)
+app/api/caixa/sessoes/route.ts           → GET sessão de caixa aberta + POST abrir caixa
+app/api/caixa/sessoes/[id]/fechar/route.ts → POST fechar caixa (calcula valor esperado x valor contado)
+app/api/caixa/movimentos/route.ts        → GET/POST sangria, suprimento e despesa da sessão aberta
+app/api/caixa/vendas/route.ts            → GET/POST venda do PDV (carrinho multi-item, rateio de desconto, split de comissão por item)
+lib/caixa.ts                             → agregação do resumo de caixa por período e por sessão (usada pelas API Routes, pelo Dashboard e pelo Caixa)
 lib/fluxoCaixa.ts                        → agregação de Contas a Pagar/Receber em aberto por faixa de vencimento (usada pelo Dashboard)
 lib/prisma.ts                            → conexão única com o banco (API Routes)
 lib/auth.ts                              → valida o login nas API Routes e descobre o tenant
@@ -93,12 +97,68 @@ Pagar/Receber), Fluxo de Caixa, Formas de Pagamento, Plano de Contas, DRE,
 Caixa aberto/fechado e Orçamento — junto com controle de acesso por papel.
 Combinado com o usuário implementar por fases:
 
-- **Fase 1 (entregue nesta versão):** controle de acesso (usuários com
-  papel), Formas de Pagamento, Plano de Contas, reorganização do menu.
-- **Fase 2 (próxima):** Caixa com abertura/fechamento (caixa único por
-  dia) e Visão de Caixa Mensal/Anual.
+- **Fase 1 (entregue):** controle de acesso (usuários com papel), Formas
+  de Pagamento, Plano de Contas, reorganização do menu.
+- **Fase 2 (entregue em 31/07/2026):** Caixa como PDV, com sessão do dia
+  (abrir/fechar caixa, sangria, suprimento, despesa) — ver seção "Caixa
+  como PDV" abaixo. Visão de Caixa Mensal/Anual fica para uma iteração
+  futura.
 - **Fase 3 (depois):** DRE completa (padrão contábil) e Orçamento,
-  usando o Plano de Contas já cadastrado nesta fase.
+  usando o Plano de Contas já cadastrado na Fase 1.
+
+## Caixa como PDV
+
+Reescrito em 31/07/2026 a pedido do usuário (inspirado num PDV de outro
+sistema). O Caixa deixou de ser "lançar 1 atendimento avulso direto" e
+passou a ter sessão de dia + venda com carrinho:
+
+1. **Abrir o caixa** (`POST /api/caixa/sessoes`) cria uma `CaixaSessao` do
+   dia com um número sequencial por tenant ("Caixa 1", "Caixa 2"...). Só
+   pode haver **1 sessão aberta por tenant por vez** — garantido por um
+   índice único parcial no banco (`uq_caixa_sessoes_aberta`), não só na
+   aplicação.
+2. **Montar a venda**: cliente + carrinho de itens (cada item é um produto
+   OU serviço do catálogo, com seu profissional e quantidade), desconto
+   opcional, forma de pagamento. Confirmar o pagamento
+   (`POST /api/caixa/vendas`) cria 1 `Venda` (cabeçalho) e, para cada item
+   do carrinho, 1 `Atendimento` (agora com `venda_id`, `quantidade` e
+   `valor_unitario`) — assim os relatórios e o Dashboard que já somavam
+   `atendimentos.valor_cobrado` continuam funcionando sem nenhuma mudança.
+3. **Sangria, suprimento e despesa** (`POST /api/caixa/movimentos`) ficam
+   vinculados à sessão aberta — nunca informados pelo cliente, sempre
+   resolvidos no servidor a partir da sessão "aberto" do tenant (mesmo
+   princípio de nunca confiar em `tenant_id`/sessão vindos do corpo da
+   requisição).
+4. **Fechar o caixa** (`POST /api/caixa/sessoes/:id/fechar`) pede o valor
+   contado na gaveta e grava, junto, o valor que o sistema esperava
+   (abertura + vendas em dinheiro + suprimento - sangria - despesa em
+   dinheiro), para conferência. Só entra nessa conta o que é fisicamente
+   dinheiro: cada Forma de Pagamento tem um campo `conta_no_caixa_fisico`
+   (editável em `/dashboard/financeiro/formas-pagamento`) — por padrão só
+   "Dinheiro" vem marcado.
+
+**Regra de valor bruto (pedido explícito do usuário):** o "Total" mostrado
+na tela do Caixa é **sempre o valor bruto** cobrado do cliente (preço já
+com o desconto da venda aplicado, mas **antes** de descontar a comissão do
+profissional) — nunca o valor líquido pós-comissão. A comissão de cada
+item é calculada no servidor (mesmo split percentual que já existia) e
+fica só nos relatórios/Dashboard (`valor_comissao`/`valor_estudio`);
+qualquer tela nova de Caixa/PDV deve seguir essa regra e nunca misturar os
+dois valores no mesmo "Total".
+
+O desconto da venda é **rateado proporcionalmente** entre os itens do
+carrinho (pelo peso de cada item no subtotal) antes de calcular a comissão
+de cada um — ver comentário em `POST /api/caixa/vendas`
+(`app/api/caixa/vendas/route.ts`) para o algoritmo de arredondamento
+(o último item absorve a sobra de centavos, para a soma bater exatamente
+com o total da venda).
+
+A migration `007_caixa_pdv.sql` cria `caixa_sessoes`, `caixa_movimentos` e
+`vendas`, e altera `atendimentos` (`venda_id`, `quantidade`,
+`valor_unitario`) e `formas_pagamento` (`conta_no_caixa_fisico`). Também
+relaxa a política de `select` de `formas_pagamento` (antes só
+`dono`/`financeiro` liam) para qualquer papel do tenant, já que o PDV é
+usado por `operador` também.
 
 ### Controle de acesso (papéis)
 
