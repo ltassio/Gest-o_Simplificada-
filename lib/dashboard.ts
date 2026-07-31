@@ -49,6 +49,7 @@ export async function getAgendaResumo(
     by: ["status"],
     where: { tenantId, dataHoraInicio: { gte: inicio, lte: fim } },
     _count: { _all: true },
+    orderBy: { status: "asc" },
   });
 
   let agendados = 0;
@@ -117,6 +118,7 @@ export async function getServicosMaisVendidos(
     where: { tenantId, dataAtendimento: { gte: inicio, lte: fim } },
     _count: { _all: true },
     _sum: { valorCobrado: true },
+    orderBy: { servicoId: "asc" },
   });
 
   if (grupos.length === 0) return [];
