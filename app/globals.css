@@ -16,6 +16,8 @@
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.12);
   --success: #34d399;
+  --warning: #f5b942;
+  --warning-soft: rgba(245, 185, 66, 0.12);
   --radius: 10px;
 }
 
@@ -430,4 +432,54 @@ h3 {
 .tile-desc {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* ---------- Dashboard Executivo (EF-001) ---------- */
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.alert-card {
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+
+.alert-card-alta {
+  background: var(--danger-soft);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: var(--danger);
+}
+
+.alert-card-media {
+  background: var(--warning-soft);
+  border-color: rgba(245, 185, 66, 0.35);
+  color: var(--warning);
+}
+
+.insight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insight-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.coming-soon-card {
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 14px;
 }
