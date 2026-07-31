@@ -144,25 +144,10 @@ export async function getServicosMaisVendidos(
     .slice(0, limite);
 }
 
-export interface ProdutosResumo {
-  cadastrados: number;
-  valor_catalogo: number;
-}
-
-// Estoque e Giro (Anexo A) não têm campo de quantidade no cadastro de
-// produtos hoje (migration 006 só adicionou o tipo 'produto' dentro de
-// servicos) — mostrar isso exigiria modelar controle de estoque, que fica
-// para uma fase futura. O que dá para mostrar com dado real é o catálogo.
-export async function getProdutosResumo(tenantId: string): Promise<ProdutosResumo> {
-  const produtos = (await prisma.servico.findMany({
-    where: { tenantId, tipo: "produto" },
-    select: { preco: true },
-  })) as any[];
-  return {
-    cadastrados: produtos.length,
-    valor_catalogo: round2(produtos.reduce((acc, p) => acc + Number(p.preco), 0)),
-  };
-}
+// Bloco "Produtos" (estoque/catálogo) foi removido do Dashboard a pedido do
+// usuário em 30/07/2026 — o sistema não rastreia estoque/giro de verdade, só
+// tinha cadastro/valor de catálogo, e não fazia sentido manter esse
+// indicador. Ver histórico do projeto se precisar recuperar.
 
 export interface ContasVencidasResumo {
   pagar_qtd: number;
