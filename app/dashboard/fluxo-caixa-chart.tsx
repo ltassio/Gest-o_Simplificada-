@@ -54,8 +54,27 @@ export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] })
             itemStyle={{ color: "var(--text)" }}
           />
           <Legend />
-          <Bar dataKey="total_a_receber" name="A Receber" fill="var(--success)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="total_a_pagar" name="A Pagar" fill="var(--danger)" radius={[4, 4, 0, 0]} />
+          {/* isAnimationActive={false}: bug real encontrado em produção em
+              31/07/2026 — com a animação padrão do recharts ligada, as
+              barras deste gráfico (que mistura valores positivos e
+              negativos com a Line de saldo_acumulado no mesmo eixo Y)
+              ficavam praticamente invisíveis, presas perto da altura 0 da
+              animação em vez de crescerem até a altura final. Desligar a
+              animação faz a barra renderizar direto no tamanho correto. */}
+          <Bar
+            dataKey="total_a_receber"
+            name="A Receber"
+            fill="var(--success)"
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
+          <Bar
+            dataKey="total_a_pagar"
+            name="A Pagar"
+            fill="var(--danger)"
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+          />
           <Line
             type="monotone"
             dataKey="saldo_acumulado"
@@ -63,6 +82,7 @@ export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] })
             stroke="var(--accent)"
             strokeWidth={2}
             dot={{ r: 3 }}
+            isAnimationActive={false}
           />
         </ComposedChart>
       </ResponsiveContainer>
