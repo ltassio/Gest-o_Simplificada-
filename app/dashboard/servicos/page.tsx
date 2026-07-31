@@ -23,6 +23,21 @@ function formatarMoeda(valor: number) {
   return Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Estilo dos campos de edição inline na tabela: sem isso, <input>/<select>
+// "crus" (sem a classe .field, que só existe para o padrão label+input do
+// formulário "Novo cadastro") ficam com a aparência branca padrão do
+// navegador, destoando do tema escuro — encontrado em QA visual em
+// 30/07/2026.
+const editFieldStyle: React.CSSProperties = {
+  background: "var(--bg-elevated-2)",
+  border: "1px solid var(--border)",
+  borderRadius: 6,
+  padding: "6px 8px",
+  color: "var(--text)",
+  fontSize: 13,
+  outline: "none",
+};
+
 // Cadastro de Produtos e Serviços (aba "Produto e Serviço"): mesma tabela
 // "servicos" de sempre, agora com a coluna tipo ('servico' | 'produto') para
 // diferenciar os dois no mesmo cadastro. Duração e custo de material só
@@ -304,20 +319,25 @@ export default function ServicosPage() {
                     <select
                       value={edTipo}
                       onChange={(e) => setEdTipo(e.target.value as "servico" | "produto")}
+                      style={editFieldStyle}
                     >
                       <option value="servico">Serviço</option>
                       <option value="produto">Produto</option>
                     </select>
                   </td>
                   <td>
-                    <input value={edNome} onChange={(e) => setEdNome(e.target.value)} />
+                    <input
+                      value={edNome}
+                      onChange={(e) => setEdNome(e.target.value)}
+                      style={{ ...editFieldStyle, width: 140 }}
+                    />
                   </td>
                   <td>
                     {edTipo === "servico" ? (
                       <input
                         type="number"
                         min={1}
-                        style={{ width: 80 }}
+                        style={{ ...editFieldStyle, width: 70 }}
                         value={edDuracao}
                         onChange={(e) => setEdDuracao(e.target.value)}
                       />
@@ -331,7 +351,7 @@ export default function ServicosPage() {
                         type="number"
                         min={0}
                         step="0.01"
-                        style={{ width: 90 }}
+                        style={{ ...editFieldStyle, width: 80 }}
                         value={edCustoMaterial}
                         onChange={(e) => setEdCustoMaterial(e.target.value)}
                       />
@@ -344,14 +364,14 @@ export default function ServicosPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      style={{ width: 90 }}
+                      style={{ ...editFieldStyle, width: 80 }}
                       value={edPreco}
                       onChange={(e) => setEdPreco(e.target.value)}
                     />
                   </td>
                   <td>
                     <input
-                      style={{ width: 110 }}
+                      style={{ ...editFieldStyle, width: 100 }}
                       value={edCategoria}
                       onChange={(e) => setEdCategoria(e.target.value)}
                       placeholder="opcional"
