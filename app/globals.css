@@ -1,7 +1,20 @@
 /* Tema "Escuro moderno" do Gestão Simples.
    Import único em app/layout.tsx (Next.js exige que CSS global seja
    importado só no layout raiz). Usamos classes em vez de estilo inline
-   nas páginas para manter tudo consistente num único lugar. */
+   nas páginas para manter tudo consistente num único lugar.
+
+   REGRA para qualquer mudança de tema (cores trocadas, tema claro
+   adicionado etc.): toda cor de texto usada em componentes de terceiros
+   (ex.: Tooltip do recharts) precisa ser lida de --text/--text-muted, nunca
+   escrita como valor fixo tipo "#000" ou "#fff". Bug real encontrado em
+   31/07/2026: o Tooltip do recharts define contentStyle (fundo) separado de
+   labelStyle/itemStyle (texto) — se labelStyle/itemStyle não forem passados
+   explicitamente, o recharts usa preto por padrão, ficando ilegível em cima
+   do fundo escuro. Ver app/dashboard/indicador-charts.tsx e
+   app/dashboard/fluxo-caixa-chart.tsx para o padrão correto (contentStyle +
+   labelStyle + itemStyle sempre juntos, todos usando as variáveis do tema
+   abaixo) — ao trocar as cores do tema, essas variáveis já resolvem sozinhas
+   porque a cor do texto nunca é fixa. */
 
 :root {
   --bg: #0b0d12;
