@@ -113,7 +113,12 @@ export function ClientesChart({ resumo }: { resumo: ClientesResumo }) {
     { name: "Novos no período", valor: resumo.novos_periodo, color: CHART_1 },
     { name: "Inativos", valor: resumo.inativos, color: CHART_4 },
   ];
+  // domain com folga de 25% acima do maior valor: sem isso a barra do maior
+  // valor encosta na borda do gráfico e o rótulo (LabelList, posicionado
+  // "right") fica cortado fora da área visível — foi encontrado assim no
+  // teste em produção (barra de "Ativos"/"Novos no período" sem número).
   const max = Math.max(1, ...data.map((d) => d.valor));
+  const domainMax = Math.max(1, Math.ceil(max * 1.25));
 
   return (
     <div style={{ width: "100%", height: 180 }}>
@@ -125,7 +130,7 @@ export function ClientesChart({ resumo }: { resumo: ClientesResumo }) {
           barCategoryGap={18}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-          <XAxis type="number" domain={[0, max]} hide />
+          <XAxis type="number" domain={[0, domainMax]} hide />
           <YAxis
             type="category"
             dataKey="name"
@@ -158,7 +163,7 @@ export function ProfissionaisChart({ ranking }: { ranking: ResumoPorProfissional
 
   const data = ranking.map((p) => ({
     nomeCompleto: p.profissional_nome,
-    nome: truncar(p.profissional_nome),
+    nome: truncar(p.profissional_nome, 13),
     receita: p.total_cobrado,
     comissao: p.total_comissao,
   }));
@@ -232,7 +237,7 @@ export function ServicosChart({ servicos }: { servicos: ServicoMaisVendido[] }) 
 
   const data = servicos.map((s, i) => ({
     nomeCompleto: s.nome,
-    nome: `${truncar(s.nome)} · ${s.quantidade}×`,
+    nome: `${truncar(s.nome, 11)} · ${s.quantidade}×`,
     receita: s.receita,
     color: [CHART_5, CHART_1, CHART_6, CHART_3, CHART_2][i % 5],
   }));
@@ -253,7 +258,7 @@ export function ServicosChart({ servicos }: { servicos: ServicoMaisVendido[] }) 
             dataKey="nome"
             stroke="var(--text-muted)"
             fontSize={12}
-            width={140}
+            width={150}
             tickLine={false}
             axisLine={false}
           />
