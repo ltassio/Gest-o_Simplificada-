@@ -8,18 +8,17 @@ import {
   getAgendaResumo,
   getClientesResumo,
   getServicosMaisVendidos,
-  getProdutosResumo,
   getContasVencidasResumo,
   gerarAlertas,
   gerarInsights,
   type AgendaResumo,
   type ClientesResumo,
   type ServicoMaisVendido,
-  type ProdutosResumo,
   type ContasVencidasResumo,
 } from "@/lib/dashboard";
 import FluxoCaixaChart from "./fluxo-caixa-chart";
 import PeriodoFiltro from "./periodo-filtro";
+import { AgendaChart, ClientesChart, ProfissionaisChart, ServicosChart } from "./indicador-charts";
 
 function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -62,7 +61,11 @@ function calcularPeriodo(periodo: string, agora: Date): { inicio: Date; fim: Dat
 // Dashboard Executivo (EF-001 — Dashboard Executivo e Business
 // Intelligence, anexada pelo usuário em 30/07/2026). Reestruturado em
 // blocos seguindo a Seção 6 da EF (Saúde do Negócio, Financeiro, Agenda,
-// Clientes, Profissionais, Serviços, Produtos, Marketing, IA e Alertas).
+// Clientes, Profissionais, Serviços, Marketing, IA e Alertas). Bloco
+// "Produtos" (catálogo/estoque) foi removido a pedido do usuário — ver
+// comentário em lib/dashboard.ts. Agenda, Clientes, Profissionais e
+// Serviços viram gráficos (recharts, ver ./indicador-charts.tsx) em vez de
+// cards de número/tabela, também a pedido do usuário.
 // Marketing e IA preditiva não têm fonte de dado no sistema hoje (não há
 // rastreio de origem/CAC nem modelo de ML — a própria EF exclui "Machine
 // Learning avançado" do escopo, Seção 3) e ficam como blocos "em breve" /
@@ -95,7 +98,6 @@ export default async function DashboardHomePage({
   let agendaResumo: AgendaResumo | null = null;
   let clientesResumo: ClientesResumo | null = null;
   let servicosMaisVendidos: ServicoMaisVendido[] = [];
-  let produtosResumo: ProdutosResumo | null = null;
   let contasVencidas: ContasVencidasResumo | null = null;
   let erro: string | null = null;
   let veFinanceiro = false;
@@ -115,7 +117,6 @@ export default async function DashboardHomePage({
       agendaRes,
       clientesRes,
       servicosRes,
-      produtosRes,
       contasVencidasRes,
     ] = await Promise.all([
       getResumoCaixa(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
@@ -124,7 +125,6 @@ export default async function DashboardHomePage({
       getAgendaResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getClientesResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getServicosMaisVendidos(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
-      getProdutosResumo(meuPerfil.tenantId),
       veFinanceiro ? getContasVencidasResumo(meuPerfil.tenantId) : Promise.resolve(null),
     ]);
 
@@ -134,7 +134,6 @@ export default async function DashboardHomePage({
     agendaResumo = agendaRes;
     clientesResumo = clientesRes;
     servicosMaisVendidos = servicosRes;
-    produtosResumo = produtosRes;
     contasVencidas = contasVencidasRes;
   } catch {
     erro = "Não foi possível carregar os indicadores agora.";
@@ -284,109 +283,35 @@ export default async function DashboardHomePage({
 
           {/* Bloco: Agenda */}
           <h2 className="section-title">Agenda · {periodoLabel}</h2>
-          <div className="stat-grid">
-            <div className="stat-card">
-              <div className="stat-label">Agendamentos no período</div>
-              <div className="stat-value">{agendaResumo?.total ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Concluídos</div>
-              <div className="stat-value">{agendaResumo?.concluidos ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Cancelados</div>
-              <div className="stat-value">{agendaResumo?.cancelados ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Taxa de cancelamento</div>
-              <div className="stat-value">{agendaResumo?.taxa_cancelamento ?? 0}%</div>
-            </div>
+          <div className="card" style={{ padding: 20 }}>
+            {agendaResumo ? (
+              <AgendaChart resumo={agendaResumo} />
+            ) : (
+              <p className="empty-state">Nenhum agendamento no período selecionado.</p>
+            )}
           </div>
 
           {/* Bloco: Clientes */}
           <h2 className="section-title">Clientes</h2>
-          <div className="stat-grid">
-            <div className="stat-card">
-              <div className="stat-label">Ativos</div>
-              <div className="stat-value">{clientesResumo?.ativos ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Novos no período</div>
-              <div className="stat-value">{clientesResumo?.novos_periodo ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Inativos</div>
-              <div className="stat-value">{clientesResumo?.inativos ?? 0}</div>
-            </div>
+          <div className="card" style={{ padding: 20 }}>
+            {clientesResumo ? (
+              <ClientesChart resumo={clientesResumo} />
+            ) : (
+              <p className="empty-state">Sem dados de clientes ainda.</p>
+            )}
           </div>
 
           {/* Bloco: Profissionais */}
           <h2 className="section-title">Profissionais · Ranking do período</h2>
-          {rankingProfissionais.length === 0 ? (
-            <p className="empty-state">Nenhum atendimento lançado no período selecionado.</p>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Profissional</th>
-                  <th>Atendimentos</th>
-                  <th>Receita</th>
-                  <th>Comissão</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankingProfissionais.map((p) => (
-                  <tr key={p.profissional_id}>
-                    <td>{p.profissional_nome}</td>
-                    <td>{p.quantidade_atendimentos}</td>
-                    <td>{formatarMoeda(p.total_cobrado)}</td>
-                    <td>{formatarMoeda(p.total_comissao)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div className="card" style={{ padding: 20 }}>
+            <ProfissionaisChart ranking={rankingProfissionais} />
+          </div>
 
           {/* Bloco: Serviços */}
           <h2 className="section-title">Serviços · Mais vendidos no período</h2>
-          {servicosMaisVendidos.length === 0 ? (
-            <p className="empty-state">Nenhum atendimento lançado no período selecionado.</p>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Serviço</th>
-                  <th>Quantidade</th>
-                  <th>Receita</th>
-                </tr>
-              </thead>
-              <tbody>
-                {servicosMaisVendidos.map((s) => (
-                  <tr key={s.servico_id}>
-                    <td>{s.nome}</td>
-                    <td>{s.quantidade}</td>
-                    <td>{formatarMoeda(s.receita)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* Bloco: Produtos */}
-          <h2 className="section-title">Produtos</h2>
-          <div className="stat-grid" style={{ marginBottom: 8 }}>
-            <div className="stat-card">
-              <div className="stat-label">Produtos cadastrados</div>
-              <div className="stat-value">{produtosResumo?.cadastrados ?? 0}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Valor em catálogo</div>
-              <div className="stat-value">{formatarMoeda(produtosResumo?.valor_catalogo ?? 0)}</div>
-            </div>
+          <div className="card" style={{ padding: 20 }}>
+            <ServicosChart servicos={servicosMaisVendidos} />
           </div>
-          <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 0 }}>
-            Controle de estoque e giro ainda não são rastreados pelo sistema — ficam para uma fase futura.
-          </p>
 
           {/* Bloco: Marketing */}
           <h2 className="section-title">Marketing</h2>
