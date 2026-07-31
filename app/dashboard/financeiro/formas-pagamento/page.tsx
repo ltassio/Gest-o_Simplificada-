@@ -113,7 +113,9 @@ export default function FormasPagamentoPage() {
     <div>
       <h1 style={{ marginBottom: 6 }}>Formas de Pagamento</h1>
       <p style={{ color: "var(--text-muted)", margin: 0 }}>
-        Usadas ao lançar Contas a Pagar/Receber e, em breve, no Caixa.
+        Usadas ao lançar Contas a Pagar/Receber e no Caixa. "Conta no caixa
+        físico" marca se uma venda paga nessa forma soma no valor esperado da
+        gaveta ao fechar o caixa — normalmente só "Dinheiro".
       </p>
 
       {erro && (
