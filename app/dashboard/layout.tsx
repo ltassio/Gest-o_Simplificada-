@@ -39,7 +39,7 @@ export default async function DashboardLayout({
         </div>
 
         <Link href="/dashboard" className="sidebar-link">
-          Início
+          Dashboard
         </Link>
         <Link href="/dashboard/agenda" className="sidebar-link">
           Agenda
