@@ -109,24 +109,27 @@ export async function getServicosMaisVendidos(
   fim: Date,
   limite = 5
 ): Promise<ServicoMaisVendido[]> {
-  // Anotado como any[]: o retorno de groupBy tem um tipo condicional muito
-  // aninhado e o TS às vezes falha em inferir os parâmetros dos .map/.sort
-  // encadeados logo abaixo — mais simples anotar aqui do que reconstruir o
-  // tipo à mão.
-  const grupos: any[] = await prisma.atendimento.groupBy({
+  // Cast para any[] feito DEPOIS do await (não como anotação do const): se a
+  // gente anota `const grupos: any[] = await prisma...groupBy(...)`, o TS usa
+  // esse tipo esperado para inferir os genéricos do próprio groupBy, e é
+  // exatamente isso que quebra o build (ele passa a exigir que o objeto de
+  // argumento também seja compatível com "any[]"). Fazendo o cast fora, o
+  // groupBy é checado com seu tipo normal e só o resultado vira any[] para
+  // simplificar os .map/.sort encadeados abaixo.
+  const grupos = (await prisma.atendimento.groupBy({
     by: ["servicoId"],
     where: { tenantId, dataAtendimento: { gte: inicio, lte: fim } },
     _count: { _all: true },
     _sum: { valorCobrado: true },
     orderBy: { servicoId: "asc" },
-  });
+  })) as any[];
 
   if (grupos.length === 0) return [];
 
-  const servicos: any[] = await prisma.servico.findMany({
+  const servicos = (await prisma.servico.findMany({
     where: { id: { in: grupos.map((g) => g.servicoId) } },
     select: { id: true, nome: true },
-  });
+  })) as any[];
   const nomePorId = new Map<string, string>(servicos.map((s) => [s.id, s.nome]));
 
   return grupos
@@ -150,10 +153,10 @@ export interface ProdutosResumo {
 // servicos) — mostrar isso exigiria modelar controle de estoque, que fica
 // para uma fase futura. O que dá para mostrar com dado real é o catálogo.
 export async function getProdutosResumo(tenantId: string): Promise<ProdutosResumo> {
-  const produtos: any[] = await prisma.servico.findMany({
+  const produtos = (await prisma.servico.findMany({
     where: { tenantId, tipo: "produto" },
     select: { preco: true },
-  });
+  })) as any[];
   return {
     cadastrados: produtos.length,
     valor_catalogo: round2(produtos.reduce((acc, p) => acc + Number(p.preco), 0)),
@@ -173,7 +176,7 @@ export async function getContasVencidasResumo(
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
-  const [pagar, receber]: [any[], any[]] = await Promise.all([
+  const [pagar, receber] = (await Promise.all([
     prisma.contaPagar.findMany({
       where: { tenantId, status: "a_pagar", dataVencimento: { lt: hoje } },
       select: { valor: true },
@@ -182,7 +185,7 @@ export async function getContasVencidasResumo(
       where: { tenantId, status: "a_receber", dataVencimento: { lt: hoje } },
       select: { valor: true },
     }),
-  ]);
+  ])) as [any[], any[]];
 
   return {
     pagar_qtd: pagar.length,
