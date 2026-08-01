@@ -10,7 +10,8 @@ import {
   getClientesResumo,
   getServicosMaisVendidos,
   getContasVencidasResumo,
-  getLucroDoMes,
+  getDespesasDoMes,
+  calcularLucroMes,
   calcularJanelaMesAtual,
   calcularJanelaMesAnterior,
   calcularScoreGeral,
@@ -138,6 +139,15 @@ export default async function DashboardHomePage({
     // por RLS), por isso o filtro por papel precisa ser feito aqui no
     // código — não dá para confiar só na política do banco quando o
     // acesso é via Prisma.
+    // Todas as consultas do Dashboard rodam num único Promise.all — inclusive
+    // as despesas do mês (getDespesasDoMes), que antes só podiam ser
+    // buscadas DEPOIS deste bloco (precisavam da receita/comissão já
+    // calculadas) e viravam uma segunda viagem ao banco em série, atrasando
+    // a página inteira sem necessidade (bug de performance real encontrado
+    // em produção em 01/08/2026 — clique na sidebar demorando visivelmente
+    // mais depois que o Dashboard passou a somar mais indicadores). O
+    // cálculo do Lucro do Mês (calcularLucroMes) agora é só aritmética local
+    // depois que tudo já chegou, sem nova consulta.
     const [
       resumoPeriodoRes,
       resumoMesRes,
@@ -149,6 +159,7 @@ export default async function DashboardHomePage({
       clientesRes,
       servicosRes,
       contasVencidasRes,
+      despesasMesRes,
     ] = await Promise.all([
       getResumoCaixa(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getResumoCaixa(meuPerfil.tenantId, inicioMes, fimMes),
@@ -160,6 +171,7 @@ export default async function DashboardHomePage({
       getClientesResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getServicosMaisVendidos(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       veFinanceiro ? getContasVencidasResumo(meuPerfil.tenantId) : Promise.resolve(null),
+      getDespesasDoMes(meuPerfil.tenantId, inicioMes, fimMes),
     ]);
 
     resumoPeriodo = resumoPeriodoRes;
@@ -173,13 +185,7 @@ export default async function DashboardHomePage({
     servicosMaisVendidos = servicosRes;
     contasVencidas = contasVencidasRes;
 
-    lucroMes = await getLucroDoMes(
-      meuPerfil.tenantId,
-      inicioMes,
-      fimMes,
-      resumoMes.total_cobrado,
-      resumoMes.total_comissoes
-    );
+    lucroMes = calcularLucroMes(resumoMes.total_cobrado, resumoMes.total_comissoes, despesasMesRes);
 
     scoreGeral = calcularScoreGeral({
       agendaOcupada,
