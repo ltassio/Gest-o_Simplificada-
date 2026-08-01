@@ -3,6 +3,7 @@
 import {
   ComposedChart,
   Bar,
+  Cell,
   Line,
   XAxis,
   YAxis,
@@ -17,17 +18,26 @@ function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Cor do "A Pagar" nos buckets vencidos: vermelho mais apagado que
+// --danger, para diferenciar visualmente "já venceu" (passado, não é o
+// alerta principal deste gráfico — isso já vira Alerta em outro lugar do
+// Dashboard) de "vai vencer nos próximos dias" (o que este gráfico existe
+// para mostrar).
+const COR_VENCIDO = "#c25656";
+
 // Gráfico de fluxo de caixa: barras mostram o que entra (Contas a Receber)
-// e o que sai (Contas a Pagar) em cada faixa de vencimento; a linha mostra
-// o saldo acumulado projetado — se ela cruza para negativo, é o sinal
-// visual de déficit (o caixa não cobre o que vai vencer).
+// e o que sai (Contas a Pagar) em cada bucket; a linha mostra o saldo
+// acumulado projetado — se ela cruza para negativo, é o sinal visual de
+// déficit (o caixa não cobre o que vai vencer). Visão diária desde
+// 01/08/2026 (a pedido do usuário) — "Vencido" agregado, 14 dias
+// individuais (hoje + 13), "Depois" agregado (ver lib/fluxoCaixa.ts).
 export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] }) {
   return (
     <div style={{ width: "100%", height: 280 }}>
       <ResponsiveContainer>
         <ComposedChart data={buckets} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={12} />
+          <XAxis dataKey="label" stroke="var(--text-muted)" fontSize={10} interval={0} angle={-45} textAnchor="end" height={50} />
           <YAxis
             stroke="var(--text-muted)"
             fontSize={12}
@@ -74,7 +84,11 @@ export default function FluxoCaixaChart({ buckets }: { buckets: FluxoBucket[] })
             fill="var(--danger)"
             radius={[4, 4, 0, 0]}
             isAnimationActive={false}
-          />
+          >
+            {buckets.map((b, i) => (
+              <Cell key={i} fill={b.tipo === "vencido" ? COR_VENCIDO : "var(--danger)"} />
+            ))}
+          </Bar>
           <Line
             type="monotone"
             dataKey="saldo_acumulado"

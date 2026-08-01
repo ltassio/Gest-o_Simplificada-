@@ -6,15 +6,23 @@ import { getFluxoDeCaixa, type FluxoCaixa } from "@/lib/fluxoCaixa";
 import { podeVerFinanceiro } from "@/lib/permissoes";
 import {
   getAgendaResumo,
+  getAgendaOcupada,
   getClientesResumo,
   getServicosMaisVendidos,
   getContasVencidasResumo,
+  getLucroDoMes,
+  calcularJanelaMesAtual,
+  calcularJanelaMesAnterior,
+  calcularScoreGeral,
   gerarAlertas,
   gerarInsights,
   type AgendaResumo,
+  type AgendaOcupada,
   type ClientesResumo,
   type ServicoMaisVendido,
   type ContasVencidasResumo,
+  type LucroMes,
+  type ScoreGeral,
 } from "@/lib/dashboard";
 import FluxoCaixaChart from "./fluxo-caixa-chart";
 import PeriodoFiltro from "./periodo-filtro";
@@ -58,18 +66,33 @@ function calcularPeriodo(periodo: string, agora: Date): { inicio: Date; fim: Dat
   }
 }
 
+function classeScore(valor: number): string {
+  if (valor >= 70) return "score-bom";
+  if (valor >= 40) return "score-medio";
+  return "score-ruim";
+}
+
 // Dashboard Executivo (EF-001 — Dashboard Executivo e Business
-// Intelligence, anexada pelo usuário em 30/07/2026). Reestruturado em
-// blocos seguindo a Seção 6 da EF (Saúde do Negócio, Financeiro, Agenda,
-// Clientes, Profissionais, Serviços, Marketing, IA e Alertas). Bloco
-// "Produtos" (catálogo/estoque) foi removido a pedido do usuário — ver
-// comentário em lib/dashboard.ts. Agenda, Clientes, Profissionais e
-// Serviços viram gráficos (recharts, ver ./indicador-charts.tsx) em vez de
-// cards de número/tabela, também a pedido do usuário.
-// Marketing e IA preditiva não têm fonte de dado no sistema hoje (não há
-// rastreio de origem/CAC nem modelo de ML — a própria EF exclui "Machine
-// Learning avançado" do escopo, Seção 3) e ficam como blocos "em breve" /
-// insights por regra simples, ver lib/dashboard.ts.
+// Intelligence, anexada pelo usuário em 30/07/2026). Redesenhado em
+// 01/08/2026 a partir de um mockup aprovado pelo usuário, seguindo os
+// princípios de staff-product-designer (uma ação/leitura primária por
+// tela, cortar cards decorativos sem ação associada, poucas cores):
+//   - Alertas sobem para logo depois do cabeçalho (o que precisa de atenção
+//     agora vem antes de qualquer número "de passeio").
+//   - "Visão do mês" é um bloco novo, com os 8 indicadores pedidos pelo
+//     usuário em 01/08/2026 (Score Geral, Receita/Lucro do mês, Ticket
+//     Médio, Agenda Ocupada, Clientes Ativos, Cancelamentos, No Show).
+//     Diferente do resto da página, esse bloco NÃO segue o filtro de
+//     período do topo — é sempre o mês corrente (calendário), porque o
+//     Score Geral compara com o mês anterior e precisa de uma janela
+//     estável (ver calcularJanelaMesAtual/Anterior em lib/dashboard.ts).
+//   - Os cards de "Contas vencidas" separados foram cortados — a mesma
+//     informação já aparece em Alertas, manter os dois era redundante.
+//   - Agenda+Clientes e Profissionais+Serviços passam a ficar lado a lado
+//     (.split-grid) em vez de empilhados, para caber mais leitura na
+//     mesma rolagem.
+//   - Bloco "Marketing" (estático, "em breve") foi removido — não tinha
+//     ação nem dado nenhum, só ocupava espaço.
 export default async function DashboardHomePage({
   searchParams,
 }: {
@@ -89,16 +112,21 @@ export default async function DashboardHomePage({
 
   const agora = new Date();
   const { inicio: inicioPeriodo, fim: fimPeriodo } = calcularPeriodo(periodoParam, agora);
-  const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 0, 0, 0);
-  const fimHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
+  const { inicio: inicioMes, fim: fimMes } = calcularJanelaMesAtual(agora);
+  const { inicio: inicioMesAnterior, fim: fimMesAnterior } = calcularJanelaMesAnterior(agora);
 
   let resumoPeriodo: ResumoCaixa | null = null;
-  let resumoHoje: ResumoCaixa | null = null;
+  let resumoMes: ResumoCaixa | null = null;
+  let resumoMesAnterior: ResumoCaixa | null = null;
   let fluxoCaixa: FluxoCaixa | null = null;
   let agendaResumo: AgendaResumo | null = null;
+  let agendaResumoMes: AgendaResumo | null = null;
+  let agendaOcupada: AgendaOcupada | null = null;
   let clientesResumo: ClientesResumo | null = null;
   let servicosMaisVendidos: ServicoMaisVendido[] = [];
   let contasVencidas: ContasVencidasResumo | null = null;
+  let lucroMes: LucroMes | null = null;
+  let scoreGeral: ScoreGeral | null = null;
   let erro: string | null = null;
   let veFinanceiro = false;
 
@@ -112,29 +140,53 @@ export default async function DashboardHomePage({
     // acesso é via Prisma.
     const [
       resumoPeriodoRes,
-      resumoHojeRes,
+      resumoMesRes,
+      resumoMesAnteriorRes,
       fluxoRes,
       agendaRes,
+      agendaMesRes,
+      agendaOcupadaRes,
       clientesRes,
       servicosRes,
       contasVencidasRes,
     ] = await Promise.all([
       getResumoCaixa(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
-      getResumoCaixa(meuPerfil.tenantId, inicioHoje, fimHoje),
+      getResumoCaixa(meuPerfil.tenantId, inicioMes, fimMes),
+      getResumoCaixa(meuPerfil.tenantId, inicioMesAnterior, fimMesAnterior),
       veFinanceiro ? getFluxoDeCaixa(meuPerfil.tenantId) : Promise.resolve(null),
       getAgendaResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
+      getAgendaResumo(meuPerfil.tenantId, inicioMes, fimMes),
+      getAgendaOcupada(meuPerfil.tenantId, inicioMes, fimMes),
       getClientesResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getServicosMaisVendidos(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       veFinanceiro ? getContasVencidasResumo(meuPerfil.tenantId) : Promise.resolve(null),
     ]);
 
     resumoPeriodo = resumoPeriodoRes;
-    resumoHoje = resumoHojeRes;
+    resumoMes = resumoMesRes;
+    resumoMesAnterior = resumoMesAnteriorRes;
     fluxoCaixa = fluxoRes;
     agendaResumo = agendaRes;
+    agendaResumoMes = agendaMesRes;
+    agendaOcupada = agendaOcupadaRes;
     clientesResumo = clientesRes;
     servicosMaisVendidos = servicosRes;
     contasVencidas = contasVencidasRes;
+
+    lucroMes = await getLucroDoMes(
+      meuPerfil.tenantId,
+      inicioMes,
+      fimMes,
+      resumoMes.total_cobrado,
+      resumoMes.total_comissoes
+    );
+
+    scoreGeral = calcularScoreGeral({
+      agendaOcupada,
+      agenda: agendaResumoMes,
+      receitaMesAtual: resumoMes.total_cobrado,
+      receitaMesAnterior: resumoMesAnterior.total_cobrado,
+    });
   } catch {
     erro = "Não foi possível carregar os indicadores agora.";
   }
@@ -158,9 +210,9 @@ export default async function DashboardHomePage({
         })
       : [];
 
-  const ticketMedio =
-    resumoPeriodo && resumoPeriodo.quantidade_atendimentos > 0
-      ? resumoPeriodo.total_cobrado / resumoPeriodo.quantidade_atendimentos
+  const ticketMedioMes =
+    resumoMes && resumoMes.quantidade_atendimentos > 0
+      ? resumoMes.total_cobrado / resumoMes.quantidade_atendimentos
       : 0;
 
   const rankingProfissionais = resumoPeriodo
@@ -193,32 +245,8 @@ export default async function DashboardHomePage({
         </p>
       ) : (
         <>
-          {/* Bloco: Saúde do Negócio */}
-          <h2 className="section-title">Saúde do Negócio · {periodoLabel}</h2>
-          <div className="stat-grid">
-            <div className="stat-card">
-              <div className="stat-label">Receita no período</div>
-              <div className="stat-value">{formatarMoeda(resumoPeriodo?.total_cobrado ?? 0)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Ticket médio</div>
-              <div className="stat-value">{formatarMoeda(ticketMedio)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Comissões a repassar</div>
-              <div className="stat-value">{formatarMoeda(resumoPeriodo?.total_comissoes ?? 0)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Fica para o estúdio</div>
-              <div className="stat-value">{formatarMoeda(resumoPeriodo?.total_estudio ?? 0)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Atendimentos hoje</div>
-              <div className="stat-value">{resumoHoje?.quantidade_atendimentos ?? 0}</div>
-            </div>
-          </div>
-
-          {/* Bloco: Alertas */}
+          {/* Bloco: Alertas — logo após o cabeçalho, antes de qualquer
+              número "de passeio" (redesenho de 01/08/2026). */}
           {alertas.length > 0 && (
             <>
               <h2 className="section-title">Alertas</h2>
@@ -235,26 +263,75 @@ export default async function DashboardHomePage({
             </>
           )}
 
-          {/* Bloco: Financeiro */}
-          {veFinanceiro && (
-            <>
-              <h2 className="section-title">Financeiro</h2>
-              <div className="stat-grid" style={{ marginBottom: 16 }}>
-                <div className="stat-card">
-                  <div className="stat-label">Contas a pagar vencidas</div>
-                  <div className="stat-value">{contasVencidas?.pagar_qtd ?? 0}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
-                    {formatarMoeda(contasVencidas?.pagar_total ?? 0)}
-                  </div>
+          {/* Bloco: Visão do mês — os 8 indicadores pedidos em 01/08/2026.
+              Sempre mês corrente (calendário), não segue o filtro de
+              período do topo (ver comentário no topo do arquivo). */}
+          <h2 className="section-title">Visão do mês</h2>
+          <div className="split-grid">
+            {scoreGeral && (
+              <div className="score-card">
+                <div className={`score-value ${classeScore(scoreGeral.valor)}`}>
+                  {Math.round(scoreGeral.valor)}
                 </div>
-                <div className="stat-card">
-                  <div className="stat-label">Contas a receber vencidas</div>
-                  <div className="stat-value">{contasVencidas?.receber_qtd ?? 0}</div>
-                  <div style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
-                    {formatarMoeda(contasVencidas?.receber_total ?? 0)}
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 6 }}>Score Geral do Negócio</div>
+                  <div className="score-breakdown">
+                    <span>Ocupação da agenda: {scoreGeral.componentes.ocupacao}/100</span>
+                    <span>Cancelamento: {scoreGeral.componentes.cancelamento}/100</span>
+                    <span>No-show: {scoreGeral.componentes.no_show}/100</span>
+                    <span>Tendência de receita: {scoreGeral.componentes.tendencia_receita}/100</span>
                   </div>
                 </div>
               </div>
+            )}
+
+            <div className="stat-card stat-card-hero">
+              <div className="stat-label">Receita do mês</div>
+              <div className="stat-value">{formatarMoeda(resumoMes?.total_cobrado ?? 0)}</div>
+              <div className="hero-secondary-stats">
+                <div>
+                  <div className="hero-secondary-stat-label">Lucro do mês</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroMes?.lucro ?? 0)}</div>
+                </div>
+                <div>
+                  <div className="hero-secondary-stat-label">Ticket médio</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(ticketMedioMes)}</div>
+                </div>
+                <div>
+                  <div className="hero-secondary-stat-label">Comissões a repassar</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(resumoMes?.total_comissoes ?? 0)}</div>
+                </div>
+                <div>
+                  <div className="hero-secondary-stat-label">Despesas do mês</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroMes?.despesas ?? 0)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-grid">
+            <div className="stat-card">
+              <div className="stat-label">Agenda Ocupada</div>
+              <div className="stat-value">{agendaOcupada?.percentual ?? 0}%</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Clientes Ativos</div>
+              <div className="stat-value">{clientesResumo?.ativos ?? 0}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Cancelamentos</div>
+              <div className="stat-value">{agendaResumoMes?.taxa_cancelamento ?? 0}%</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">No Show</div>
+              <div className="stat-value">{agendaResumoMes?.taxa_no_show ?? 0}%</div>
+            </div>
+          </div>
+
+          {/* Bloco: Financeiro */}
+          {veFinanceiro && (
+            <>
+              <h2 className="section-title">Financeiro · Fluxo de caixa projetado (dia a dia)</h2>
               {fluxoCaixa ? (
                 <div className="card" style={{ padding: 20 }}>
                   <FluxoCaixaChart buckets={fluxoCaixa.buckets} />
@@ -281,45 +358,34 @@ export default async function DashboardHomePage({
             </>
           )}
 
-          {/* Bloco: Agenda */}
-          <h2 className="section-title">Agenda · {periodoLabel}</h2>
-          <div className="card" style={{ padding: 20 }}>
-            {agendaResumo ? (
-              <AgendaChart resumo={agendaResumo} />
-            ) : (
-              <p className="empty-state">Nenhum agendamento no período selecionado.</p>
-            )}
+          {/* Bloco: Agenda + Clientes lado a lado */}
+          <h2 className="section-title">Agenda e Clientes · {periodoLabel}</h2>
+          <div className="split-grid">
+            <div className="card" style={{ padding: 20 }}>
+              {agendaResumo ? (
+                <AgendaChart resumo={agendaResumo} />
+              ) : (
+                <p className="empty-state">Nenhum agendamento no período selecionado.</p>
+              )}
+            </div>
+            <div className="card" style={{ padding: 20 }}>
+              {clientesResumo ? (
+                <ClientesChart resumo={clientesResumo} />
+              ) : (
+                <p className="empty-state">Sem dados de clientes ainda.</p>
+              )}
+            </div>
           </div>
 
-          {/* Bloco: Clientes */}
-          <h2 className="section-title">Clientes</h2>
-          <div className="card" style={{ padding: 20 }}>
-            {clientesResumo ? (
-              <ClientesChart resumo={clientesResumo} />
-            ) : (
-              <p className="empty-state">Sem dados de clientes ainda.</p>
-            )}
-          </div>
-
-          {/* Bloco: Profissionais */}
-          <h2 className="section-title">Profissionais · Ranking do período</h2>
-          <div className="card" style={{ padding: 20 }}>
-            <ProfissionaisChart ranking={rankingProfissionais} />
-          </div>
-
-          {/* Bloco: Serviços */}
-          <h2 className="section-title">Serviços · Mais vendidos no período</h2>
-          <div className="card" style={{ padding: 20 }}>
-            <ServicosChart servicos={servicosMaisVendidos} />
-          </div>
-
-          {/* Bloco: Marketing */}
-          <h2 className="section-title">Marketing</h2>
-          <div className="card coming-soon-card">
-            <p style={{ margin: 0 }}>
-              Origem de clientes, CAC e ROI de campanhas ainda não têm fonte de dado no sistema — nenhuma tela
-              registra canal de aquisição ou investimento em marketing hoje. Bloco reservado para uma fase futura.
-            </p>
+          {/* Bloco: Profissionais + Serviços lado a lado */}
+          <h2 className="section-title">Profissionais e Serviços · {periodoLabel}</h2>
+          <div className="split-grid">
+            <div className="card" style={{ padding: 20 }}>
+              <ProfissionaisChart ranking={rankingProfissionais} />
+            </div>
+            <div className="card" style={{ padding: 20 }}>
+              <ServicosChart servicos={servicosMaisVendidos} />
+            </div>
           </div>
 
           {/* Bloco: IA */}

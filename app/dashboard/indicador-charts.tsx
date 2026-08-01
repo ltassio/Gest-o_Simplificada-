@@ -71,6 +71,7 @@ export function AgendaChart({ resumo }: { resumo: AgendaResumo }) {
     { name: "Agendados", value: resumo.agendados, color: CHART_1 },
     { name: "Concluídos", value: resumo.concluidos, color: CHART_2 },
     { name: "Cancelados", value: resumo.cancelados, color: CHART_4 },
+    { name: "Não compareceu", value: resumo.nao_compareceu, color: CHART_3 },
   ].filter((d) => d.value > 0);
 
   if (resumo.total === 0) {
@@ -118,6 +119,9 @@ export function AgendaChart({ resumo }: { resumo: AgendaResumo }) {
         ))}
         <span className="chart-legend-item">
           Taxa de cancelamento <strong className="chart-legend-value">{resumo.taxa_cancelamento}%</strong>
+        </span>
+        <span className="chart-legend-item">
+          Taxa de no-show <strong className="chart-legend-value">{resumo.taxa_no_show}%</strong>
         </span>
       </div>
     </div>
