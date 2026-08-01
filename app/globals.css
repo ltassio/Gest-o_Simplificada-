@@ -388,6 +388,18 @@ h3 {
   border-color: rgba(124, 92, 255, 0.35);
 }
 
+.badge-success {
+  background: rgba(52, 199, 89, 0.16);
+  color: var(--success);
+  border-color: rgba(52, 199, 89, 0.35);
+}
+
+.badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: rgba(255, 69, 58, 0.35);
+}
+
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -420,6 +432,85 @@ h3 {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-top: 24px;
+}
+
+/* Redesenho do Dashboard (01/08/2026): blocos que antes empilhavam um
+   embaixo do outro (Agenda/Clientes, Profissionais/Serviços) agora ficam
+   lado a lado quando há espaço — auto-fit/minmax em vez de @media, seguindo
+   o mesmo padrão já usado em .stat-grid/.tile-grid neste arquivo. */
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* Card de destaque (Receita do mês) — mesma base de .stat-card, número bem
+   maior porque é o número que o dono do negócio mais quer ver de relance. */
+.stat-card-hero .stat-value {
+  font-size: 40px;
+}
+
+.hero-secondary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.hero-secondary-stat-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.hero-secondary-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Score Geral do Negócio — nota 0–100 calculada em lib/dashboard.ts
+   (calcularScoreGeral). Cor muda de faixa para dar leitura instantânea sem
+   precisar ler o número. */
+.score-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.score-value {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.score-value.score-bom {
+  color: var(--success);
+}
+
+.score-value.score-medio {
+  color: var(--warning);
+}
+
+.score-value.score-ruim {
+  color: var(--danger);
+}
+
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .tile {
