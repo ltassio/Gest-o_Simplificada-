@@ -83,12 +83,18 @@ model Cliente {
 }
 
 model Profissional {
-  id                 String   @id @default(uuid()) @db.Uuid
-  tenantId           String   @map("tenant_id") @db.Uuid
-  nome               String
-  percentualComissao Decimal  @default(0) @map("percentual_comissao") @db.Decimal(5, 2)
-  ativo              Boolean  @default(true)
-  createdAt          DateTime @default(now()) @map("created_at")
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  nome                String
+  percentualComissao  Decimal  @default(0) @map("percentual_comissao") @db.Decimal(5, 2)
+  // Capacidade de trabalho em horas/semana — base do indicador "Agenda
+  // Ocupada" do Dashboard (migration 008, 01/08/2026). Distinto do
+  // "horasProdutivasMes" de ParametroPrecificacao: aquele é único por
+  // tenant e serve para precificar serviço; este é por profissional e serve
+  // para medir ociosidade real da agenda.
+  cargaHorariaSemanal Decimal  @default(40) @map("carga_horaria_semanal") @db.Decimal(5, 2)
+  ativo               Boolean  @default(true)
+  createdAt           DateTime @default(now()) @map("created_at")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   agendamentos Agendamento[]
@@ -137,6 +143,9 @@ model Agendamento {
   servicoId        String   @map("servico_id") @db.Uuid
   dataHoraInicio   DateTime @map("data_hora_inicio")
   dataHoraFim      DateTime @map("data_hora_fim")
+  // "agendado" | "concluido" (setado automaticamente pelo Caixa ao lançar
+  // atendimento vinculado) | "cancelado" | "nao_compareceu" (ambos com botão
+  // na tela de Agenda — migration 008, 01/08/2026).
   status           String   @default("agendado")
   createdAt        DateTime @default(now()) @map("created_at")
 
