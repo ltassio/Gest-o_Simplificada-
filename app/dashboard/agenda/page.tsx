@@ -26,6 +26,13 @@ interface Agendamento {
   servicos: { nome: string } | null;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  agendado: "Agendado",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+  nao_compareceu: "Não compareceu",
+};
+
 // Agenda simples do MVP (Documento de Visão do Produto, Seção 6): lista os
 // agendamentos de um dia e permite criar um novo. Fala direto com o
 // Supabase via PostgREST (protegido por RLS) — decisão de arquitetura
@@ -47,6 +54,7 @@ export default function AgendaPage() {
   const [servicoId, setServicoId] = useState("");
   const [hora, setHora] = useState("09:00");
   const [salvando, setSalvando] = useState(false);
+  const [atualizandoId, setAtualizandoId] = useState<string | null>(null);
 
   useEffect(() => {
     carregarListasBase();
@@ -139,6 +147,39 @@ export default function AgendaPage() {
     }
   }
 
+  // Marca um agendamento como cancelado ou não compareceu. "Concluído" não
+  // ganha botão aqui de propósito: já é setado automaticamente quando o
+  // atendimento é lançado no Caixa vinculado a este agendamento (contrato
+  // documentado em app/api/caixa/atendimentos/route.ts) — duplicar esse
+  // controle aqui abriria brecha para os dois números divergirem.
+  async function atualizarStatus(
+    agendamento: Agendamento,
+    novoStatus: "cancelado" | "nao_compareceu"
+  ) {
+    const mensagem =
+      novoStatus === "cancelado"
+        ? `Cancelar o agendamento de ${agendamento.clientes?.nome ?? "cliente"}?`
+        : `Marcar ${agendamento.clientes?.nome ?? "cliente"} como não compareceu?`;
+    if (!window.confirm(mensagem)) return;
+
+    setAtualizandoId(agendamento.id);
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ status: novoStatus })
+        .eq("id", agendamento.id);
+
+      if (error) {
+        setErro("Não foi possível atualizar o agendamento: " + error.message);
+        return;
+      }
+      setErro(null);
+      carregarAgendamentosDoDia();
+    } finally {
+      setAtualizandoId(null);
+    }
+  }
+
   return (
     <div>
       <h1 style={{ marginBottom: 6 }}>Agenda</h1>
@@ -208,6 +249,7 @@ export default function AgendaPage() {
               <th>Profissional</th>
               <th>Serviço</th>
               <th>Status</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -223,7 +265,37 @@ export default function AgendaPage() {
                 <td>{a.profissionais?.nome ?? "-"}</td>
                 <td>{a.servicos?.nome ?? "-"}</td>
                 <td>
-                  <span className="badge badge-accent">{a.status}</span>
+                  <span
+                    className={
+                      a.status === "concluido"
+                        ? "badge badge-success"
+                        : a.status === "cancelado" || a.status === "nao_compareceu"
+                        ? "badge badge-danger"
+                        : "badge badge-accent"
+                    }
+                  >
+                    {STATUS_LABEL[a.status] ?? a.status}
+                  </span>
+                </td>
+                <td>
+                  {a.status === "agendado" && (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        className="btn"
+                        disabled={atualizandoId === a.id}
+                        onClick={() => atualizarStatus(a, "nao_compareceu")}
+                      >
+                        Não compareceu
+                      </button>
+                      <button
+                        className="btn"
+                        disabled={atualizandoId === a.id}
+                        onClick={() => atualizarStatus(a, "cancelado")}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
