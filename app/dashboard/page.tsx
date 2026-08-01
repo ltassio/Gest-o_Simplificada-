@@ -33,6 +33,17 @@ function formatarMoeda(valor: number) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Formata uma Date como "YYYY-MM-DD" usando os componentes locais (mesma
+// convenção de calcularPeriodo abaixo) — não usar toISOString() aqui, que
+// converte pra UTC e pode devolver o dia errado dependendo do fuso do
+// servidor.
+function formatarDataParaInput(data: Date): string {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
 const PERIODO_LABEL: Record<string, string> = {
   mes_atual: "este mês",
   mes_anterior: "mês passado",
@@ -40,7 +51,12 @@ const PERIODO_LABEL: Record<string, string> = {
   "30_dias": "últimos 30 dias",
 };
 
-function calcularPeriodo(periodo: string, agora: Date): { inicio: Date; fim: Date } {
+function calcularPeriodo(
+  periodo: string,
+  agora: Date,
+  personalizadoInicio?: string,
+  personalizadoFim?: string
+): { inicio: Date; fim: Date } {
   switch (periodo) {
     case "mes_anterior": {
       const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0);
@@ -57,6 +73,26 @@ function calcularPeriodo(periodo: string, agora: Date): { inicio: Date; fim: Dat
       const inicio = new Date(agora);
       inicio.setDate(inicio.getDate() - 29);
       inicio.setHours(0, 0, 0, 0);
+      return { inicio, fim: agora };
+    }
+    case "personalizado": {
+      // Datas vêm dos query params "inicio"/"fim" (formato YYYY-MM-DD,
+      // preenchidos pelo PeriodoFiltro). Se ainda não vieram ou vierem
+      // inválidas (ex.: usuário acabou de trocar pra "Personalizado" antes
+      // de escolher as datas), cai no mês atual como padrão sensato em vez
+      // de quebrar a página.
+      const inicioValido = personalizadoInicio ? new Date(`${personalizadoInicio}T00:00:00`) : null;
+      const fimValido = personalizadoFim ? new Date(`${personalizadoFim}T23:59:59.999`) : null;
+      if (
+        inicioValido &&
+        fimValido &&
+        !isNaN(inicioValido.getTime()) &&
+        !isNaN(fimValido.getTime()) &&
+        inicioValido <= fimValido
+      ) {
+        return { inicio: inicioValido, fim: fimValido };
+      }
+      const inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
       return { inicio, fim: agora };
     }
     case "mes_atual":
@@ -80,13 +116,10 @@ function classeScore(valor: number): string {
 // tela, cortar cards decorativos sem ação associada, poucas cores):
 //   - Alertas sobem para logo depois do cabeçalho (o que precisa de atenção
 //     agora vem antes de qualquer número "de passeio").
-//   - "Visão do mês" é um bloco novo, com os 8 indicadores pedidos pelo
-//     usuário em 01/08/2026 (Score Geral, Receita/Lucro do mês, Ticket
-//     Médio, Agenda Ocupada, Clientes Ativos, Cancelamentos, No Show).
-//     Diferente do resto da página, esse bloco NÃO segue o filtro de
-//     período do topo — é sempre o mês corrente (calendário), porque o
-//     Score Geral compara com o mês anterior e precisa de uma janela
-//     estável (ver calcularJanelaMesAtual/Anterior em lib/dashboard.ts).
+//   - "Visão do período" (renomeado de "Visão do mês" em 01/08/2026 — ver
+//     comentário mais abaixo) traz os 8 indicadores pedidos pelo usuário em
+//     01/08/2026 (Score Geral, Receita/Lucro, Ticket Médio, Agenda Ocupada,
+//     Clientes Ativos, Cancelamentos, No Show).
 //   - Os cards de "Contas vencidas" separados foram cortados — a mesma
 //     informação já aparece em Alertas, manter os dois era redundante.
 //   - Agenda+Clientes e Profissionais+Serviços passam a ficar lado a lado
@@ -97,7 +130,7 @@ function classeScore(valor: number): string {
 export default async function DashboardHomePage({
   searchParams,
 }: {
-  searchParams?: { periodo?: string };
+  searchParams?: { periodo?: string; inicio?: string; fim?: string };
 }) {
   const supabase = createClient();
   const {
@@ -109,12 +142,21 @@ export default async function DashboardHomePage({
   }
 
   const periodoParam = searchParams?.periodo ?? "mes_atual";
-  const periodoLabel = PERIODO_LABEL[periodoParam] ?? PERIODO_LABEL.mes_atual;
 
   const agora = new Date();
-  const { inicio: inicioPeriodo, fim: fimPeriodo } = calcularPeriodo(periodoParam, agora);
+  const { inicio: inicioPeriodo, fim: fimPeriodo } = calcularPeriodo(
+    periodoParam,
+    agora,
+    searchParams?.inicio,
+    searchParams?.fim
+  );
   const { inicio: inicioMes, fim: fimMes } = calcularJanelaMesAtual(agora);
   const { inicio: inicioMesAnterior, fim: fimMesAnterior } = calcularJanelaMesAnterior(agora);
+
+  const periodoLabel =
+    periodoParam === "personalizado"
+      ? `${inicioPeriodo.toLocaleDateString("pt-BR")} a ${fimPeriodo.toLocaleDateString("pt-BR")}`
+      : PERIODO_LABEL[periodoParam] ?? PERIODO_LABEL.mes_atual;
 
   let resumoPeriodo: ResumoCaixa | null = null;
   let resumoMes: ResumoCaixa | null = null;
@@ -122,11 +164,12 @@ export default async function DashboardHomePage({
   let fluxoCaixa: FluxoCaixa | null = null;
   let agendaResumo: AgendaResumo | null = null;
   let agendaResumoMes: AgendaResumo | null = null;
-  let agendaOcupada: AgendaOcupada | null = null;
+  let agendaOcupadaPeriodo: AgendaOcupada | null = null;
+  let agendaOcupadaMes: AgendaOcupada | null = null;
   let clientesResumo: ClientesResumo | null = null;
   let servicosMaisVendidos: ServicoMaisVendido[] = [];
   let contasVencidas: ContasVencidasResumo | null = null;
-  let lucroMes: LucroMes | null = null;
+  let lucroPeriodo: LucroMes | null = null;
   let scoreGeral: ScoreGeral | null = null;
   let erro: string | null = null;
   let veFinanceiro = false;
@@ -139,15 +182,23 @@ export default async function DashboardHomePage({
     // por RLS), por isso o filtro por papel precisa ser feito aqui no
     // código — não dá para confiar só na política do banco quando o
     // acesso é via Prisma.
-    // Todas as consultas do Dashboard rodam num único Promise.all — inclusive
-    // as despesas do mês (getDespesasDoMes), que antes só podiam ser
-    // buscadas DEPOIS deste bloco (precisavam da receita/comissão já
-    // calculadas) e viravam uma segunda viagem ao banco em série, atrasando
-    // a página inteira sem necessidade (bug de performance real encontrado
-    // em produção em 01/08/2026 — clique na sidebar demorando visivelmente
-    // mais depois que o Dashboard passou a somar mais indicadores). O
-    // cálculo do Lucro do Mês (calcularLucroMes) agora é só aritmética local
-    // depois que tudo já chegou, sem nova consulta.
+    //
+    // Todas as consultas do Dashboard rodam num único Promise.all (bug de
+    // performance real encontrado em produção em 01/08/2026 — clique na
+    // sidebar demorando visivelmente mais depois que o Dashboard passou a
+    // somar mais indicadores).
+    //
+    // Duas versões de Agenda Ocupada/Agenda Resumo rodam em paralelo desde
+    // 01/08/2026: uma pro período selecionado no filtro do topo (alimenta
+    // os cards de "Visão do período" e o gráfico de Agenda) e outra sempre
+    // fixa no mês corrente/anterior (alimenta só o Score Geral). Isso é
+    // proposital, não duplicação por engano — decisão confirmada com o
+    // usuário: os cards de "Visão do período" devem seguir o filtro
+    // (inclusive a nova opção "Personalizado"), mas o Score Geral precisa
+    // de uma janela estável de calendário pra comparação "mês atual vs mês
+    // anterior" continuar fazendo sentido — se ele também seguisse um
+    // período arbitrário, a "tendência de receita" que compõe o score
+    // deixaria de ter um "anterior" claro pra comparar.
     const [
       resumoPeriodoRes,
       resumoMesRes,
@@ -155,11 +206,12 @@ export default async function DashboardHomePage({
       fluxoRes,
       agendaRes,
       agendaMesRes,
-      agendaOcupadaRes,
+      agendaOcupadaPeriodoRes,
+      agendaOcupadaMesRes,
       clientesRes,
       servicosRes,
       contasVencidasRes,
-      despesasMesRes,
+      despesasPeriodoRes,
     ] = await Promise.all([
       getResumoCaixa(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getResumoCaixa(meuPerfil.tenantId, inicioMes, fimMes),
@@ -167,11 +219,12 @@ export default async function DashboardHomePage({
       veFinanceiro ? getFluxoDeCaixa(meuPerfil.tenantId) : Promise.resolve(null),
       getAgendaResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getAgendaResumo(meuPerfil.tenantId, inicioMes, fimMes),
+      getAgendaOcupada(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getAgendaOcupada(meuPerfil.tenantId, inicioMes, fimMes),
       getClientesResumo(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       getServicosMaisVendidos(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
       veFinanceiro ? getContasVencidasResumo(meuPerfil.tenantId) : Promise.resolve(null),
-      getDespesasDoMes(meuPerfil.tenantId, inicioMes, fimMes),
+      getDespesasDoMes(meuPerfil.tenantId, inicioPeriodo, fimPeriodo),
     ]);
 
     resumoPeriodo = resumoPeriodoRes;
@@ -180,15 +233,27 @@ export default async function DashboardHomePage({
     fluxoCaixa = fluxoRes;
     agendaResumo = agendaRes;
     agendaResumoMes = agendaMesRes;
-    agendaOcupada = agendaOcupadaRes;
+    agendaOcupadaPeriodo = agendaOcupadaPeriodoRes;
+    agendaOcupadaMes = agendaOcupadaMesRes;
     clientesResumo = clientesRes;
     servicosMaisVendidos = servicosRes;
     contasVencidas = contasVencidasRes;
 
-    lucroMes = calcularLucroMes(resumoMes.total_cobrado, resumoMes.total_comissoes, despesasMesRes);
+    // Lucro/Receita/Ticket médio/Comissões/Despesas de "Visão do período"
+    // agora seguem o período selecionado (resumoPeriodo), não mais o mês
+    // corrente fixo — é a mudança pedida pelo usuário em 01/08/2026 pra
+    // fazer sentido escolher "Mês passado" ou um período personalizado e
+    // ver esses números mudarem.
+    lucroPeriodo = calcularLucroMes(
+      resumoPeriodo.total_cobrado,
+      resumoPeriodo.total_comissoes,
+      despesasPeriodoRes
+    );
 
+    // Score Geral continua fixo em mês atual vs mês anterior, de propósito
+    // (ver comentário acima do Promise.all).
     scoreGeral = calcularScoreGeral({
-      agendaOcupada,
+      agendaOcupada: agendaOcupadaMes,
       agenda: agendaResumoMes,
       receitaMesAtual: resumoMes.total_cobrado,
       receitaMesAnterior: resumoMesAnterior.total_cobrado,
@@ -216,9 +281,9 @@ export default async function DashboardHomePage({
         })
       : [];
 
-  const ticketMedioMes =
-    resumoMes && resumoMes.quantidade_atendimentos > 0
-      ? resumoMes.total_cobrado / resumoMes.quantidade_atendimentos
+  const ticketMedioPeriodo =
+    resumoPeriodo && resumoPeriodo.quantidade_atendimentos > 0
+      ? resumoPeriodo.total_cobrado / resumoPeriodo.quantidade_atendimentos
       : 0;
 
   const rankingProfissionais = resumoPeriodo
@@ -242,7 +307,11 @@ export default async function DashboardHomePage({
             Logado como <strong style={{ color: "var(--text)" }}>{user.email}</strong>
           </p>
         </div>
-        <PeriodoFiltro valorAtual={periodoParam} />
+        <PeriodoFiltro
+          valorAtual={periodoParam}
+          inicioAtual={formatarDataParaInput(inicioPeriodo)}
+          fimAtual={formatarDataParaInput(fimPeriodo)}
+        />
       </div>
 
       {erro ? (
@@ -269,10 +338,13 @@ export default async function DashboardHomePage({
             </>
           )}
 
-          {/* Bloco: Visão do mês — os 8 indicadores pedidos em 01/08/2026.
-              Sempre mês corrente (calendário), não segue o filtro de
-              período do topo (ver comentário no topo do arquivo). */}
-          <h2 className="section-title">Visão do mês</h2>
+          {/* Bloco: Visão do período — os 8 indicadores pedidos em
+              01/08/2026. Até 01/08/2026 esse bloco era sempre fixo no mês
+              corrente, independente do filtro do topo; a partir de agora
+              segue o período selecionado (inclusive "Personalizado"),
+              exceto o Score Geral, que continua comparando sempre mês
+              atual vs mês anterior (ver comentário no Promise.all acima). */}
+          <h2 className="section-title">Visão do período · {periodoLabel}</h2>
           <div className="split-grid">
             {scoreGeral && (
               <div className="score-card">
@@ -287,29 +359,32 @@ export default async function DashboardHomePage({
                     <span>No-show: {scoreGeral.componentes.no_show}/100</span>
                     <span>Tendência de receita: {scoreGeral.componentes.tendencia_receita}/100</span>
                   </div>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8, marginBottom: 0 }}>
+                    Sempre compara mês atual vs mês anterior — não muda com o filtro de período acima.
+                  </p>
                 </div>
               </div>
             )}
 
             <div className="stat-card stat-card-hero">
-              <div className="stat-label">Receita do mês</div>
-              <div className="stat-value">{formatarMoeda(resumoMes?.total_cobrado ?? 0)}</div>
+              <div className="stat-label">Receita do período</div>
+              <div className="stat-value">{formatarMoeda(resumoPeriodo?.total_cobrado ?? 0)}</div>
               <div className="hero-secondary-stats">
                 <div>
-                  <div className="hero-secondary-stat-label">Lucro do mês</div>
-                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroMes?.lucro ?? 0)}</div>
+                  <div className="hero-secondary-stat-label">Lucro do período</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroPeriodo?.lucro ?? 0)}</div>
                 </div>
                 <div>
                   <div className="hero-secondary-stat-label">Ticket médio</div>
-                  <div className="hero-secondary-stat-value">{formatarMoeda(ticketMedioMes)}</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(ticketMedioPeriodo)}</div>
                 </div>
                 <div>
                   <div className="hero-secondary-stat-label">Comissões a repassar</div>
-                  <div className="hero-secondary-stat-value">{formatarMoeda(resumoMes?.total_comissoes ?? 0)}</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(resumoPeriodo?.total_comissoes ?? 0)}</div>
                 </div>
                 <div>
-                  <div className="hero-secondary-stat-label">Despesas do mês</div>
-                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroMes?.despesas ?? 0)}</div>
+                  <div className="hero-secondary-stat-label">Despesas do período</div>
+                  <div className="hero-secondary-stat-value">{formatarMoeda(lucroPeriodo?.despesas ?? 0)}</div>
                 </div>
               </div>
             </div>
@@ -318,7 +393,7 @@ export default async function DashboardHomePage({
           <div className="stat-grid">
             <div className="stat-card">
               <div className="stat-label">Agenda Ocupada</div>
-              <div className="stat-value">{agendaOcupada?.percentual ?? 0}%</div>
+              <div className="stat-value">{agendaOcupadaPeriodo?.percentual ?? 0}%</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Clientes Ativos</div>
@@ -326,11 +401,11 @@ export default async function DashboardHomePage({
             </div>
             <div className="stat-card">
               <div className="stat-label">Cancelamentos</div>
-              <div className="stat-value">{agendaResumoMes?.taxa_cancelamento ?? 0}%</div>
+              <div className="stat-value">{agendaResumo?.taxa_cancelamento ?? 0}%</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">No Show</div>
-              <div className="stat-value">{agendaResumoMes?.taxa_no_show ?? 0}%</div>
+              <div className="stat-value">{agendaResumo?.taxa_no_show ?? 0}%</div>
             </div>
           </div>
 
