@@ -7,6 +7,7 @@ const OPCOES = [
   { value: "mes_anterior", label: "Mês passado" },
   { value: "7_dias", label: "Últimos 7 dias" },
   { value: "30_dias", label: "Últimos 30 dias" },
+  { value: "personalizado", label: "Personalizado" },
 ];
 
 // Filtro global de Período do Dashboard Executivo (EF-001, Seção 9 —
@@ -18,26 +19,88 @@ const OPCOES = [
 // os demais filtros (Profissional, Serviço, Cliente etc.) exigiriam
 // reescrever cada consulta do dashboard para aceitar múltiplos filtros
 // combinados — fica para uma próxima iteração.
-export default function PeriodoFiltro({ valorAtual }: { valorAtual: string }) {
+//
+// Opção "Personalizado" adicionada em 01/08/2026 a pedido do usuário — ao
+// selecioná-la, aparecem dois campos de data (De/Até) que escrevem
+// diretamente nos query params "inicio" e "fim" (formato YYYY-MM-DD, lido
+// por calcularPeriodo em app/dashboard/page.tsx). inicioAtual/fimAtual
+// vêm do server component já calculados (nunca vazios), tanto para
+// preencher os campos quando o usuário está em "Personalizado" quanto
+// para servir de ponto de partida quando ele troca pra essa opção vindo de
+// outro período.
+export default function PeriodoFiltro({
+  valorAtual,
+  inicioAtual,
+  fimAtual,
+}: {
+  valorAtual: string;
+  inicioAtual: string;
+  fimAtual: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  function handlePeriodoChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const novoPeriodo = e.target.value;
     const params = new URLSearchParams(searchParams.toString());
-    params.set("periodo", e.target.value);
+    params.set("periodo", novoPeriodo);
+
+    if (novoPeriodo === "personalizado") {
+      // Começa a seleção personalizada a partir da janela do período atual,
+      // em vez de abrir com datas vazias.
+      params.set("inicio", inicioAtual);
+      params.set("fim", fimAtual);
+    } else {
+      params.delete("inicio");
+      params.delete("fim");
+    }
+
+    router.push(`/dashboard?${params.toString()}`);
+  }
+
+  function handleDataChange(campo: "inicio" | "fim", valor: string) {
+    if (!valor) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("periodo", "personalizado");
+    params.set(campo, valor);
     router.push(`/dashboard?${params.toString()}`);
   }
 
   return (
-    <label className="field" style={{ marginBottom: 0, minWidth: 180 }}>
-      Período
-      <select value={valorAtual} onChange={handleChange}>
-        {OPCOES.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+      <label className="field" style={{ marginBottom: 0, minWidth: 180 }}>
+        Período
+        <select value={valorAtual} onChange={handlePeriodoChange}>
+          {OPCOES.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {valorAtual === "personalizado" && (
+        <>
+          <label className="field" style={{ marginBottom: 0 }}>
+            De
+            <input
+              type="date"
+              value={inicioAtual}
+              max={fimAtual}
+              onChange={(e) => handleDataChange("inicio", e.target.value)}
+            />
+          </label>
+          <label className="field" style={{ marginBottom: 0 }}>
+            Até
+            <input
+              type="date"
+              value={fimAtual}
+              min={inicioAtual}
+              onChange={(e) => handleDataChange("fim", e.target.value)}
+            />
+          </label>
+        </>
+      )}
+    </div>
   );
 }
