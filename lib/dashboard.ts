@@ -32,14 +32,17 @@ export interface AgendaResumo {
   agendados: number;
   concluidos: number;
   cancelados: number;
+  nao_compareceu: number;
   taxa_cancelamento: number;
+  taxa_no_show: number;
 }
 
 // Conta os agendamentos do período por status (Anexo A da EF: "Ocupação,
-// Cancelamentos, No Show"). "No Show" não existe como status hoje
-// (agendamentos_status_check só aceita agendado/concluido/cancelado) —
-// registrar isso exigiria uma migration e um novo botão na tela de Agenda,
-// então por ora fica de fora em vez de ser simulado.
+// Cancelamentos, No Show"). Desde a migration 008 (01/08/2026),
+// "nao_compareceu" existe como status de verdade — ganhou botão dedicado na
+// tela de Agenda ("Não compareceu"), separado de "cancelado" porque as duas
+// coisas têm peso diferente para o negócio (um no-show ocupa a agenda sem
+// aviso; um cancelamento pode ter sido feito com antecedência).
 export async function getAgendaResumo(
   tenantId: string,
   inicio: Date,
@@ -55,19 +58,77 @@ export async function getAgendaResumo(
   let agendados = 0;
   let concluidos = 0;
   let cancelados = 0;
+  let naoCompareceu = 0;
   for (const g of grupos) {
     if (g.status === "agendado") agendados = g._count._all;
     else if (g.status === "concluido") concluidos = g._count._all;
     else if (g.status === "cancelado") cancelados = g._count._all;
+    else if (g.status === "nao_compareceu") naoCompareceu = g._count._all;
   }
-  const total = agendados + concluidos + cancelados;
+  const total = agendados + concluidos + cancelados + naoCompareceu;
 
   return {
     total,
     agendados,
     concluidos,
     cancelados,
+    nao_compareceu: naoCompareceu,
     taxa_cancelamento: total > 0 ? round2((cancelados / total) * 100) : 0,
+    taxa_no_show: total > 0 ? round2((naoCompareceu / total) * 100) : 0,
+  };
+}
+
+export interface AgendaOcupada {
+  minutos_ocupados: number;
+  minutos_capacidade: number;
+  percentual: number;
+}
+
+// Indicador "Agenda Ocupada" (tabela de indicadores solicitada em
+// 01/08/2026). Ocupado = soma da duração real dos agendamentos que
+// bloquearam a agenda no período (agendado + concluído + não compareceu —
+// cancelado fica de fora porque, em geral, libera o horário). Capacidade =
+// soma de profissionais.carga_horaria_semanal (ativos) convertida para
+// minutos e escalada pela quantidade de semanas do período selecionado.
+// Decisão explícita do usuário: cadastrar capacidade por profissional
+// (migration 008) em vez de reaproveitar "Horas produtivas/mês" da
+// Precificação, que é um número único por tenant.
+export async function getAgendaOcupada(
+  tenantId: string,
+  inicio: Date,
+  fim: Date
+): Promise<AgendaOcupada> {
+  const [agendamentos, profissionaisAtivos] = await Promise.all([
+    prisma.agendamento.findMany({
+      where: {
+        tenantId,
+        dataHoraInicio: { gte: inicio, lte: fim },
+        status: { in: ["agendado", "concluido", "nao_compareceu"] },
+      },
+      select: { dataHoraInicio: true, dataHoraFim: true },
+    }),
+    prisma.profissional.findMany({
+      where: { tenantId, ativo: true },
+      select: { cargaHorariaSemanal: true },
+    }),
+  ]);
+
+  const minutosOcupados = agendamentos.reduce(
+    (acc: number, a: any) =>
+      acc + (a.dataHoraFim.getTime() - a.dataHoraInicio.getTime()) / 60000,
+    0
+  );
+
+  const diasNoPeriodo = Math.max(1, (fim.getTime() - inicio.getTime()) / 86400000);
+  const semanas = diasNoPeriodo / 7;
+  const minutosCapacidade =
+    profissionaisAtivos.reduce((acc: number, p: any) => acc + Number(p.cargaHorariaSemanal) * 60, 0) *
+    semanas;
+
+  return {
+    minutos_ocupados: Math.round(minutosOcupados),
+    minutos_capacidade: Math.round(minutosCapacidade),
+    percentual: minutosCapacidade > 0 ? round2((minutosOcupados / minutosCapacidade) * 100) : 0,
   };
 }
 
@@ -142,6 +203,138 @@ export async function getServicosMaisVendidos(
     }))
     .sort((a, b) => b.receita - a.receita)
     .slice(0, limite);
+}
+
+// Janela do "mês corrente" (do dia 1 até agora) usada pelos indicadores da
+// tabela solicitada em 01/08/2026 (Score Geral, Receita/Lucro do mês,
+// Ticket Médio, Agenda Ocupada, Clientes Ativos, Cancelamentos, No Show) —
+// deliberadamente independente do filtro de período do resto do Dashboard,
+// porque esses indicadores formam um "resumo do mês" com cadência fixa
+// (mesma lógica de calendário todo mês) e precisam de uma janela estável
+// para comparar com o mês anterior no Score Geral.
+export function calcularJanelaMesAtual(agora: Date = new Date()): { inicio: Date; fim: Date } {
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0, 0);
+  return { inicio, fim: agora };
+}
+
+// Mesma quantidade de dias decorridos, mas no mês anterior — comparação
+// "maçã com maçã". Comparar o mês em curso (ainda incompleto) com o mês
+// anterior inteiro inflaria artificialmente uma queda só porque o mês não
+// terminou.
+export function calcularJanelaMesAnterior(agora: Date = new Date()): { inicio: Date; fim: Date } {
+  const diaAtual = agora.getDate();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0, 0);
+  const fim = new Date(agora.getFullYear(), agora.getMonth() - 1, diaAtual, 23, 59, 59, 999);
+  return { inicio, fim };
+}
+
+export interface LucroMes {
+  receita: number;
+  comissoes: number;
+  despesas: number;
+  lucro: number;
+}
+
+// Indicador "Lucro do mês" (tabela solicitada em 01/08/2026). Fórmula
+// confirmada com o usuário: Receita − Comissões − Despesas. Receita e
+// Comissões vêm do mesmo cálculo do Caixa (getResumoCaixa, passado pelo
+// chamador para não duplicar a consulta aos atendimentos). Despesas soma
+// duas fontes independentes (sem risco de contar em dobro — não há vínculo
+// entre elas no schema): saídas avulsas lançadas no Caixa (caixa_movimentos
+// tipo="despesa") e contas a pagar já pagas no período (contas_pagar com
+// status="paga", filtradas por data_pagamento — não por vencimento, porque
+// o que importa para o lucro do mês é o que realmente saiu do caixa nele).
+export async function getLucroDoMes(
+  tenantId: string,
+  inicio: Date,
+  fim: Date,
+  receita: number,
+  comissoes: number
+): Promise<LucroMes> {
+  const [movimentosDespesa, contasPagas] = await Promise.all([
+    prisma.caixaMovimento.findMany({
+      where: { tenantId, tipo: "despesa", dataMovimento: { gte: inicio, lte: fim } },
+      select: { valor: true },
+    }),
+    prisma.contaPagar.findMany({
+      where: { tenantId, status: "paga", dataPagamento: { gte: inicio, lte: fim } },
+      select: { valor: true },
+    }),
+  ]);
+
+  const despesasCaixa = (movimentosDespesa as any[]).reduce((acc, m) => acc + Number(m.valor), 0);
+  const despesasContas = (contasPagas as any[]).reduce((acc, c) => acc + Number(c.valor), 0);
+  const despesas = round2(despesasCaixa + despesasContas);
+
+  return {
+    receita: round2(receita),
+    comissoes: round2(comissoes),
+    despesas,
+    lucro: round2(receita - comissoes - despesas),
+  };
+}
+
+export interface ScoreGeral {
+  valor: number;
+  componentes: {
+    ocupacao: number;
+    cancelamento: number;
+    no_show: number;
+    tendencia_receita: number;
+  };
+}
+
+// Indicador "Score Geral do Negócio" (tabela solicitada em 01/08/2026).
+// Composição confirmada com o usuário: ocupação da agenda + cancelamento
+// (invertido) + no-show (invertido) + tendência de receita vs. o mês
+// anterior. É uma nota de 0 a 100 calculada por regra explícita — não é um
+// modelo preditivo (a EF exclui ML avançado do escopo, Seção 3), então os
+// pesos abaixo são uma escolha de produto, documentada aqui para poder ser
+// ajustada depois sem virar caixa-preta:
+//   - Ocupação (peso 35%): quanto mais perto de 100% ocupado, melhor,
+//     limitada em 100 (superlotação não soma pontos extras).
+//   - Cancelamento invertido (peso 20%): 100 − taxa×3 — no alerta existente
+//     do Dashboard, 20% de cancelamento já é tratado como acima do
+//     saudável; nessa curva 20% de cancelamento já derruba o componente
+//     para 40 pontos.
+//   - No-show invertido (peso 20%): 100 − taxa×5 — penalidade mais dura que
+//     cancelamento, porque um no-show ocupa a agenda sem aviso nenhum.
+//   - Tendência de receita (peso 25%): 50 pontos = receita estável; cada
+//     ponto percentual de crescimento soma 1 ponto (e cada ponto de queda
+//     tira 1), limitado entre 0 e 100.
+export function calcularScoreGeral(params: {
+  agendaOcupada: AgendaOcupada;
+  agenda: AgendaResumo;
+  receitaMesAtual: number;
+  receitaMesAnterior: number;
+}): ScoreGeral {
+  const { agendaOcupada, agenda, receitaMesAtual, receitaMesAnterior } = params;
+
+  const scoreOcupacao = Math.min(100, agendaOcupada.percentual);
+  const scoreCancelamento = Math.max(0, 100 - agenda.taxa_cancelamento * 3);
+  const scoreNoShow = Math.max(0, 100 - agenda.taxa_no_show * 5);
+
+  const crescimentoPercentual =
+    receitaMesAnterior > 0
+      ? ((receitaMesAtual - receitaMesAnterior) / receitaMesAnterior) * 100
+      : receitaMesAtual > 0
+      ? 100
+      : 0;
+  const scoreTendencia = Math.max(0, Math.min(100, 50 + crescimentoPercentual));
+
+  const valor = round2(
+    scoreOcupacao * 0.35 + scoreCancelamento * 0.2 + scoreNoShow * 0.2 + scoreTendencia * 0.25
+  );
+
+  return {
+    valor,
+    componentes: {
+      ocupacao: round2(scoreOcupacao),
+      cancelamento: round2(scoreCancelamento),
+      no_show: round2(scoreNoShow),
+      tendencia_receita: round2(scoreTendencia),
+    },
+  };
 }
 
 // Bloco "Produtos" (estoque/catálogo) foi removido do Dashboard a pedido do

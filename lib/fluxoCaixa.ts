@@ -2,6 +2,11 @@ import { prisma } from "./prisma";
 
 export interface FluxoBucket {
   label: string;
+  // "vencido" | "dia" | "depois" — usado pelo componente de gráfico para
+  // colorir "Vencido" de um jeito visualmente distinto das barras normais
+  // de "a pagar" (vermelho mais apagado — é passado, não é o alerta
+  // principal do gráfico).
+  tipo: "vencido" | "dia" | "depois";
   total_a_pagar: number;
   total_a_receber: number;
   saldo: number;
@@ -16,17 +21,15 @@ export interface FluxoCaixa {
   situacao: "liquidez" | "deficit";
 }
 
-// Faixas de vencimento usadas para agrupar o fluxo (Documento de Visão do
-// Produto, próxima versão — módulo de Contas a Pagar/Receber). "Vencido"
-// fica isolado na primeira faixa porque é dinheiro que já deveria ter
-// entrado/saído — não faz sentido misturar com o que ainda vai vencer.
-const FAIXAS = [
-  { label: "Vencido", min: -Infinity, max: -1 },
-  { label: "Próx. 7 dias", min: 0, max: 7 },
-  { label: "8–15 dias", min: 8, max: 15 },
-  { label: "16–30 dias", min: 16, max: 30 },
-  { label: "Depois de 30 dias", min: 31, max: Infinity },
-];
+// Visão diária do fluxo de caixa (a pedido do usuário em 01/08/2026,
+// substituindo as faixas largas anteriores — "8–15 dias" / "16–30 dias" —
+// que existiam antes desta mudança). "Vencido" continua agregado num único
+// bucket (o passado não muda, não faz sentido fatiar dia a dia); depois um
+// dia de cada vez, de hoje até 13 dias à frente (JANELA_DIAS), que é a
+// janela em que dá pra agir de verdade (adiar um pagamento, cobrar um
+// cliente); "Depois" agrega o que está mais distante num único bloco, pra
+// não virar uma régua infinita de barrinhas.
+const JANELA_DIAS = 14;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -40,6 +43,11 @@ function diasAteVencimento(dataVencimento: Date, hoje: Date): number {
     dataVencimento.getUTCDate()
   );
   return Math.round((vencUTC - hojeUTC) / 86400000);
+}
+
+function diaLabel(offset: number, hoje: Date): string {
+  const d = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + offset);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
 // Projeta, a partir das contas ainda em aberto, se o caixa tem liquidez ou
@@ -61,18 +69,26 @@ export async function getFluxoDeCaixa(tenantId: string): Promise<FluxoCaixa> {
     }),
   ]);
 
-  const buckets: FluxoBucket[] = FAIXAS.map((f) => ({
-    label: f.label,
-    total_a_pagar: 0,
-    total_a_receber: 0,
-    saldo: 0,
-    saldo_acumulado: 0,
-  }));
+  // Índice 0 = "Vencido"; índices 1..JANELA_DIAS = um dia cada (hoje até
+  // hoje+13); último índice = "Depois" (agrega o resto).
+  const buckets: FluxoBucket[] = [
+    { label: "Vencido", tipo: "vencido", total_a_pagar: 0, total_a_receber: 0, saldo: 0, saldo_acumulado: 0 },
+    ...Array.from({ length: JANELA_DIAS }, (_, offset) => ({
+      label: offset === 0 ? "Hoje" : diaLabel(offset, hoje),
+      tipo: "dia" as const,
+      total_a_pagar: 0,
+      total_a_receber: 0,
+      saldo: 0,
+      saldo_acumulado: 0,
+    })),
+    { label: "Depois", tipo: "depois", total_a_pagar: 0, total_a_receber: 0, saldo: 0, saldo_acumulado: 0 },
+  ];
 
   function bucketIndex(dataVencimento: Date): number {
     const dias = diasAteVencimento(dataVencimento, hoje);
-    const idx = FAIXAS.findIndex((f) => dias >= f.min && dias <= f.max);
-    return idx === -1 ? FAIXAS.length - 1 : idx;
+    if (dias < 0) return 0;
+    if (dias < JANELA_DIAS) return 1 + dias;
+    return buckets.length - 1;
   }
 
   let totalAPagarAberto = 0;
