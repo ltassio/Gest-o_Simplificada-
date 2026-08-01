@@ -235,22 +235,24 @@ export interface LucroMes {
   lucro: number;
 }
 
-// Indicador "Lucro do mês" (tabela solicitada em 01/08/2026). Fórmula
-// confirmada com o usuário: Receita − Comissões − Despesas. Receita e
-// Comissões vêm do mesmo cálculo do Caixa (getResumoCaixa, passado pelo
-// chamador para não duplicar a consulta aos atendimentos). Despesas soma
-// duas fontes independentes (sem risco de contar em dobro — não há vínculo
-// entre elas no schema): saídas avulsas lançadas no Caixa (caixa_movimentos
-// tipo="despesa") e contas a pagar já pagas no período (contas_pagar com
-// status="paga", filtradas por data_pagamento — não por vencimento, porque
-// o que importa para o lucro do mês é o que realmente saiu do caixa nele).
-export async function getLucroDoMes(
-  tenantId: string,
-  inicio: Date,
-  fim: Date,
-  receita: number,
-  comissoes: number
-): Promise<LucroMes> {
+// Despesas do mês (parte do indicador "Lucro do mês", tabela solicitada em
+// 01/08/2026). Soma duas fontes independentes (sem risco de contar em
+// dobro — não há vínculo entre elas no schema): saídas avulsas lançadas no
+// Caixa (caixa_movimentos tipo="despesa") e contas a pagar já pagas no
+// período (contas_pagar com status="paga", filtradas por data_pagamento —
+// não por vencimento, porque o que importa para o lucro do mês é o que
+// realmente saiu do caixa nele).
+//
+// Separada de getLucroDoMes (que existia antes como uma única função
+// async) porque o Dashboard precisa dessa consulta rodando em paralelo com
+// as outras no mesmo Promise.all — como ela antes só podia ser chamada
+// depois de já ter a receita/comissão em mãos (resumoMes), virava uma
+// segunda viagem ao banco em série, atrasando a página inteira sem
+// necessidade (bug de performance real encontrado em produção em
+// 01/08/2026 — navegação pela sidebar ficando perceptivelmente lenta depois
+// que o Dashboard passou a rodar mais consultas). calcularLucroMes (abaixo)
+// só faz a conta com o que já foi buscado, sem nova consulta.
+export async function getDespesasDoMes(tenantId: string, inicio: Date, fim: Date): Promise<number> {
   const [movimentosDespesa, contasPagas] = await Promise.all([
     prisma.caixaMovimento.findMany({
       where: { tenantId, tipo: "despesa", dataMovimento: { gte: inicio, lte: fim } },
@@ -264,12 +266,18 @@ export async function getLucroDoMes(
 
   const despesasCaixa = (movimentosDespesa as any[]).reduce((acc, m) => acc + Number(m.valor), 0);
   const despesasContas = (contasPagas as any[]).reduce((acc, c) => acc + Number(c.valor), 0);
-  const despesas = round2(despesasCaixa + despesasContas);
+  return round2(despesasCaixa + despesasContas);
+}
 
+// Fórmula do "Lucro do mês" confirmada com o usuário: Receita − Comissões −
+// Despesas. Pura/síncrona — recebe os três números já calculados (nenhum
+// novo acesso ao banco), ver getDespesasDoMes acima para o porquê da
+// separação.
+export function calcularLucroMes(receita: number, comissoes: number, despesas: number): LucroMes {
   return {
     receita: round2(receita),
     comissoes: round2(comissoes),
-    despesas,
+    despesas: round2(despesas),
     lucro: round2(receita - comissoes - despesas),
   };
 }
