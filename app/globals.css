@@ -513,6 +513,38 @@ h3 {
   color: var(--text-muted);
 }
 
+/* Tela de carregamento (loading.tsx) das rotas que buscam dado no servidor
+   antes de renderizar (Dashboard, Usuários, Fluxo de Caixa). O Next.js
+   mostra isso IMEDIATAMENTE ao clicar num link da sidebar, enquanto a
+   página de destino ainda está buscando os dados — sem isso, o clique
+   parecia travado (nada na tela até a consulta inteira terminar), bug real
+   de percepção de performance encontrado em produção em 01/08/2026. */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tile {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
