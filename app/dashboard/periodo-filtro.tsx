@@ -28,6 +28,17 @@ const OPCOES = [
 // preencher os campos quando o usuário está em "Personalizado" quanto
 // para servir de ponto de partida quando ele troca pra essa opção vindo de
 // outro período.
+// Formata a data de HOJE (no fuso do navegador do usuário) como
+// "YYYY-MM-DD", pro valor inicial do campo "Até" quando o usuário troca pra
+// "Personalizado" — recalculada a cada clique, nunca um valor fixo/cacheado.
+function formatarHoje(): string {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
 export default function PeriodoFiltro({
   valorAtual,
   inicioAtual,
@@ -46,10 +57,12 @@ export default function PeriodoFiltro({
     params.set("periodo", novoPeriodo);
 
     if (novoPeriodo === "personalizado") {
-      // Começa a seleção personalizada a partir da janela do período atual,
-      // em vez de abrir com datas vazias.
-      params.set("inicio", inicioAtual);
-      params.set("fim", fimAtual);
+      // Abre sempre a partir de hoje (data dinâmica, recalculada no momento
+      // do clique) — não herda as datas do período que estava selecionado
+      // antes, pra não parecer "travado" numa data antiga.
+      const hoje = formatarHoje();
+      params.set("inicio", hoje);
+      params.set("fim", hoje);
     } else {
       params.delete("inicio");
       params.delete("fim");
