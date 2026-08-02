@@ -79,6 +79,35 @@ export default async function DashboardLayout({
           />
         )}
 
+        {/* Aba "Relatórios Gerenciais" (pedido do usuário em 02/08/2026),
+            dividida nos dois grupos que ele pediu — Financeiro e Clientes —
+            como duas SidebarSection separadas (o componente só aceita uma
+            lista plana de links, então dois títulos seguidos reproduzem a
+            separação visual sem precisar mexer no componente). Ficam atrás
+            do mesmo controle de acesso do Financeiro porque todos os 6
+            relatórios expõem receita, lucro ou contas a receber — dado
+            sensível, mesma régua já aplicada ao resto do módulo. */}
+        {veFinanceiro && (
+          <>
+            <SidebarSection
+              title="Relatórios · Financeiro"
+              links={[
+                { href: "/dashboard/relatorios/ltv", label: "LTV (Lifetime Value)" },
+                { href: "/dashboard/relatorios/comparativo-anual", label: "Comparativo Anual" },
+                { href: "/dashboard/relatorios/comparativo-mensal", label: "Comparativo Mensal" },
+                { href: "/dashboard/relatorios/evolucao-faturamento", label: "Evolução do Faturamento" },
+              ]}
+            />
+            <SidebarSection
+              title="Relatórios · Clientes"
+              links={[
+                { href: "/dashboard/relatorios/clientes-devedores", label: "Clientes Devedores" },
+                { href: "/dashboard/relatorios/evolucao-clientes", label: "Evolução de Clientes" },
+              ]}
+            />
+          </>
+        )}
+
         {gereUsuarios && (
           <SidebarSection
             title="Administração"
