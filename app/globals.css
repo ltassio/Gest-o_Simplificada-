@@ -47,8 +47,14 @@ body {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
-    Helvetica, Arial, sans-serif;
+  /* Fonte principal trocada em 01/08/2026 pra Poppins (via next/font/google
+     em app/layout.tsx, exposta como a variável CSS --font-poppins) — pedido
+     do usuário pra bater com a fonte do material de marca dele. Mantém os
+     fallbacks de sistema depois, caso a variável não esteja disponível por
+     algum motivo (ex.: algum componente renderizado fora da árvore do
+     RootLayout). */
+  font-family: var(--font-poppins), -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -681,3 +687,4 @@ h3 {
   color: var(--text);
   font-weight: 600;
 }
+
