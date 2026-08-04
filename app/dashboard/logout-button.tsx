@@ -3,9 +3,6 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Ganhou a prop `collapsed` em 04/08/2026 (redesenho da sidebar): com a
-// sidebar recolhida numa trilha estreita, o texto "Sair" não cabe mais —
-// vira só o ícone, com o texto disponível via title (tooltip nativo).
 export default function LogoutButton({ collapsed = false }: { collapsed?: boolean }) {
   const router = useRouter();
   const supabase = createClient();
