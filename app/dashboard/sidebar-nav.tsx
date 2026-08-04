@@ -41,16 +41,33 @@ export default function SidebarNav({
 
   useEffect(() => {
     try {
-      setColapsada(localStorage.getItem(CHAVE_COLAPSO) === "1");
-    } catch {}
+      const salvo = localStorage.getItem(CHAVE_COLAPSO);
+      if (salvo !== null) {
+        setColapsada(salvo === "1");
+      } else if (typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches) {
+        setColapsada(true);
+      }
+    } catch {
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 860px)").matches) return;
+    if (colapsada) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [colapsada]);
 
   function alternarColapso() {
     setColapsada((v) => {
       const novo = !v;
       try {
         localStorage.setItem(CHAVE_COLAPSO, novo ? "1" : "0");
-      } catch {}
+      } catch {
+      }
       return novo;
     });
   }
@@ -59,7 +76,8 @@ export default function SidebarNav({
     setColapsada(false);
     try {
       localStorage.setItem(CHAVE_COLAPSO, "0");
-    } catch {}
+    } catch {
+    }
   }
 
   const grupos: NavGroup[] = [
@@ -111,12 +129,30 @@ export default function SidebarNav({
         ]
       : []),
     ...(gereUsuarios
-      ? [{ title: "Administração", icon: "settings", links: [{ href: "/dashboard/usuarios", label: "Usuários" }] }]
+      ? [
+          {
+            title: "Administração",
+            icon: "settings",
+            links: [{ href: "/dashboard/usuarios", label: "Usuários" }],
+          },
+        ]
       : []),
   ];
 
   return (
-    <nav className={`sidebar ${colapsada ? "sidebar-collapsed" : ""}`}>
+    <>
+      <button
+        type="button"
+        className="mobile-menu-btn"
+        onClick={alternarColapso}
+        aria-label={colapsada ? "Abrir menu" : "Fechar menu"}
+      >
+        <i className={`ti ${colapsada ? "ti-menu-2" : "ti-x"}`} aria-hidden="true" />
+      </button>
+
+      {!colapsada && <div className="sidebar-backdrop" onClick={alternarColapso} />}
+
+      <nav className={`sidebar ${colapsada ? "sidebar-collapsed" : ""}`}>
       <div className="sidebar-brand">
         <span className="dot" />
         {!colapsada && <span>Gestão Simples</span>}
@@ -128,7 +164,10 @@ export default function SidebarNav({
         onClick={alternarColapso}
         aria-label={colapsada ? "Expandir menu" : "Recolher menu"}
       >
-        <i className={`ti ${colapsada ? "ti-chevron-right" : "ti-chevron-left"}`} aria-hidden="true" />
+        <i
+          className={`ti ${colapsada ? "ti-chevron-right" : "ti-chevron-left"}`}
+          aria-hidden="true"
+        />
         {!colapsada && <span>Recolher menu</span>}
       </button>
 
@@ -172,6 +211,7 @@ export default function SidebarNav({
         <ThemeToggle collapsed={colapsada} />
         <LogoutButton collapsed={colapsada} />
       </div>
-    </nav>
+      </nav>
+    </>
   );
 }
