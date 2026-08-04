@@ -1,9 +1,12 @@
-ã—óíí"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LogoutButton() {
+// Ganhou a prop `collapsed` em 04/08/2026 (redesenho da sidebar): com a
+// sidebar recolhida numa trilha estreita, o texto "Sair" não cabe mais —
+// vira só o ícone, com o texto disponível via title (tooltip nativo).
+export default function LogoutButton({ collapsed = false }: { collapsed?: boolean }) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -14,8 +17,14 @@ export default function LogoutButton() {
   }
 
   return (
-    <button onClick={handleLogout} className="btn btn-ghost btn-block">
-      Sair
+    <button
+      onClick={handleLogout}
+      className="btn btn-ghost btn-block"
+      title={collapsed ? "Sair" : undefined}
+      aria-label="Sair"
+    >
+      <i className="ti ti-logout" aria-hidden="true" />
+      {!collapsed && <span style={{ marginLeft: 8 }}>Sair</span>}
     </button>
   );
 }
