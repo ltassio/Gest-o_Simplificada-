@@ -38,10 +38,45 @@ const PERIODO_LABEL: Record<string, string> = {
   mes_anterior: "mês passado",
   "7_dias": "últimos 7 dias",
   "30_dias": "últimos 30 dias",
+  personalizado: "período personalizado",
 };
 
-function calcularPeriodo(periodo: string, agora: Date): { inicio: Date; fim: Date } {
+function formatarDataParaCampo(data: Date): string {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function parseDataCampo(valor: string | undefined, fimDoDia: boolean): Date {
+  if (valor) {
+    const partes = valor.split("-").map(Number);
+    if (partes.length === 3 && partes.every((n) => !Number.isNaN(n))) {
+      const [ano, mes, dia] = partes;
+      return fimDoDia
+        ? new Date(ano, mes - 1, dia, 23, 59, 59, 999)
+        : new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+    }
+  }
+  const hoje = new Date();
+  if (fimDoDia) {
+    hoje.setHours(23, 59, 59, 999);
+  } else {
+    hoje.setHours(0, 0, 0, 0);
+  }
+  return hoje;
+}
+
+function calcularPeriodo(
+  periodo: string,
+  agora: Date,
+  inicioParam?: string,
+  fimParam?: string
+): { inicio: Date; fim: Date } {
   switch (periodo) {
+    case "personalizado": {
+      return { inicio: parseDataCampo(inicioParam, false), fim: parseDataCampo(fimParam, true) };
+    }
     case "mes_anterior": {
       const inicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0);
       const fim = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59, 999);
@@ -76,7 +111,7 @@ function classeScore(valor: number): string {
 export default async function DashboardHomePage({
   searchParams,
 }: {
-  searchParams?: { periodo?: string };
+  searchParams?: { periodo?: string; inicio?: string; fim?: string };
 }) {
   const supabase = createClient();
   const {
@@ -91,7 +126,14 @@ export default async function DashboardHomePage({
   const periodoLabel = PERIODO_LABEL[periodoParam] ?? PERIODO_LABEL.mes_atual;
 
   const agora = new Date();
-  const { inicio: inicioPeriodo, fim: fimPeriodo } = calcularPeriodo(periodoParam, agora);
+  const { inicio: inicioPeriodo, fim: fimPeriodo } = calcularPeriodo(
+    periodoParam,
+    agora,
+    searchParams?.inicio,
+    searchParams?.fim
+  );
+  const inicioAtual = formatarDataParaCampo(inicioPeriodo);
+  const fimAtual = formatarDataParaCampo(fimPeriodo);
   const { inicio: inicioMes, fim: fimMes } = calcularJanelaMesAtual(agora);
   const { inicio: inicioMesAnterior, fim: fimMesAnterior } = calcularJanelaMesAnterior(agora);
 
@@ -208,7 +250,7 @@ export default async function DashboardHomePage({
             Logado como <strong style={{ color: "var(--text)" }}>{user.email}</strong>
           </p>
         </div>
-        <PeriodoFiltro valorAtual={periodoParam} />
+        <PeriodoFiltro valorAtual={periodoParam} inicioAtual={inicioAtual} fimAtual={fimAtual} />
       </div>
 
       {erro ? (
