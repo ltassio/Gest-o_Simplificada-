@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfilForUserId } from "@/lib/auth";
 import { podeVerFinanceiro, podeGerenciarUsuarios } from "@/lib/permissoes";
-import LogoutButton from "./logout-button";
-import SidebarSection from "./sidebar-section";
+import SidebarNav from "./sidebar-nav";
 
 export default async function DashboardLayout({
   children,
@@ -30,92 +28,13 @@ export default async function DashboardLayout({
   const veFinanceiro = podeVerFinanceiro(meuPerfil.papel);
   const gereUsuarios = podeGerenciarUsuarios(meuPerfil.papel);
 
+  // Redesenho de 04/08/2026: toda a navegação (ícones, recolher/expandir,
+  // tema claro/escuro) mudou pra um client component (SidebarNav) porque
+  // precisa de estado no navegador — este layout continua só resolvendo
+  // sessão/permissão no servidor e repassando o resultado já pronto.
   return (
     <div className="dashboard-shell">
-      <nav className="sidebar">
-        <div className="sidebar-brand">
-          <span className="dot" />
-          <span>Gestão Simples</span>
-        </div>
-
-        <Link href="/dashboard" className="sidebar-link">
-          Dashboard
-        </Link>
-        <Link href="/dashboard/agenda" className="sidebar-link">
-          Agenda
-        </Link>
-        <Link href="/dashboard/caixa" className="sidebar-link">
-          Caixa
-        </Link>
-
-        <SidebarSection
-          title="Produto e Serviço"
-          links={[{ href: "/dashboard/servicos", label: "Cadastro de Produto e Serviço" }]}
-        />
-
-        <SidebarSection
-          title="Cadastro de Parceiro"
-          links={[
-            ...(veFinanceiro
-              ? [{ href: "/dashboard/fornecedores", label: "Fornecedor" }]
-              : []),
-            { href: "/dashboard/profissionais", label: "Profissional" },
-            { href: "/dashboard/clientes", label: "Cliente" },
-          ]}
-        />
-
-        {veFinanceiro && (
-          <SidebarSection
-            title="Financeiro"
-            links={[
-              { href: "/dashboard/contas-a-pagar", label: "Lançamento · Contas a Pagar" },
-              { href: "/dashboard/contas-a-receber", label: "Lançamento · Contas a Receber" },
-              { href: "/dashboard/financeiro/fluxo-caixa", label: "Fluxo de Caixa" },
-              { href: "/dashboard/financeiro/contas-bancarias", label: "Contas Bancárias" },
-              { href: "/dashboard/financeiro/formas-pagamento", label: "Formas de Pagamento" },
-              { href: "/dashboard/financeiro/plano-contas", label: "Plano de Contas" },
-              { href: "/dashboard/precificacao", label: "Precificação" },
-            ]}
-          />
-        )}
-
-        {/* Aba "Relatório Gerencial" (pedido do usuário em 02/08/2026,
-            unificada em 02/08/2026 — antes eram duas SidebarSection
-            separadas, "Relatórios · Financeiro" e "Relatórios · Clientes";
-            o usuário pediu pra aglutinar num único lugar). Continua sendo
-            uma única lista (o componente SidebarSection só aceita isso),
-            só que agora com um título só — a ordem interna mantém os 4
-            relatórios de Financeiro primeiro, depois os 2 de Clientes.
-            Fica atrás do mesmo controle de acesso do Financeiro porque
-            todos os 6 relatórios expõem receita, lucro ou contas a
-            receber — dado sensível, mesma régua já aplicada ao resto do
-            módulo. */}
-        {veFinanceiro && (
-          <SidebarSection
-            title="Relatório Gerencial"
-            links={[
-              { href: "/dashboard/relatorios/ltv", label: "LTV (Lifetime Value)" },
-              { href: "/dashboard/relatorios/comparativo-anual", label: "Comparativo Anual" },
-              { href: "/dashboard/relatorios/comparativo-mensal", label: "Comparativo Mensal" },
-              { href: "/dashboard/relatorios/evolucao-faturamento", label: "Evolução do Faturamento" },
-              { href: "/dashboard/relatorios/clientes-devedores", label: "Clientes Devedores" },
-              { href: "/dashboard/relatorios/evolucao-clientes", label: "Evolução de Clientes" },
-            ]}
-          />
-        )}
-
-        {gereUsuarios && (
-          <SidebarSection
-            title="Administração"
-            links={[{ href: "/dashboard/usuarios", label: "Usuários" }]}
-          />
-        )}
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">{user.email}</div>
-          <LogoutButton />
-        </div>
-      </nav>
+      <SidebarNav veFinanceiro={veFinanceiro} gereUsuarios={gereUsuarios} userEmail={user.email ?? ""} />
       <main className="main-content">{children}</main>
     </div>
   );
