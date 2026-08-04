@@ -1,4 +1,4 @@
-"use client";
+ã—óíí"use client";
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
